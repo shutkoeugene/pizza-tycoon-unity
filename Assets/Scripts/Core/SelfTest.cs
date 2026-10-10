@@ -24,7 +24,7 @@ namespace PizzaTycoon
                     yield return null;
                 }
                 g.State.Player.cash += 0;
-                foreach (var tab in new[] { "Рестораны", "Меню", "Персонал", "Финансы", "Рынок", "Конкуренты", "Новости" })
+                foreach (var tab in new[] { "Рестораны", "Меню", "Персонал", "Интерьер", "Реклама", "Финансы", "Рынок", "Конкуренты", "Штаб", "Клиенты", "Новости" })
                 { ui.OpenTab(tab); yield return null; }
                 ui.CloseWindow();
                 for (int day = 0; day < 120; day++) Simulation.Step(g.State);

@@ -6,7 +6,7 @@ using UnityEngine.UI;
 
 namespace PizzaTycoon
 {
-    public class GameUI : MonoBehaviour
+    public partial class GameUI : MonoBehaviour
     {
         GameController G => GameController.I;
         GameState S => G.State;
@@ -53,7 +53,8 @@ namespace PizzaTycoon
                 txtDebt.text = "Долг " + UIKit.Money(S.Player.loan);
                 var mine = S.RestaurantsOf(0);
                 float rep = mine.Count == 0 ? 0 : mine.Average(r => r.reputation);
-                txtRep.text = "Репутация " + Mathf.RoundToInt(rep) + "/" + S.City.goalReputation;
+                int stars = 0; foreach (var rr in mine) stars += rr.stars;
+                txtRep.text = "Реп. " + Mathf.RoundToInt(rep) + "  Звёзды " + stars + "  Штаб " + S.Player.hq;
                 txtEvent.text = S.eventDaysLeft > 0 ? S.eventText : "";
                 txtSpeed.text = G.Speed == 0 ? "ПАУЗА" : new string('>', G.Speed);
                 dayBar.fillAmount = G.DayTime / G.DayLength;
@@ -139,7 +140,7 @@ namespace PizzaTycoon
             txtDay = UIKit.Label(row, "", 26); UIKit.Size(txtDay.gameObject, 140);
             txtCash = UIKit.Label(row, "", 30, UIKit.Good, TextAnchor.MiddleLeft, FontStyle.Bold); UIKit.Size(txtCash.gameObject, 220);
             txtDebt = UIKit.Label(row, "", 22, UIKit.Dim); UIKit.Size(txtDebt.gameObject, 200);
-            txtRep = UIKit.Label(row, "", 24); UIKit.Size(txtRep.gameObject, 260);
+            txtRep = UIKit.Label(row, "", 22); txtRep.horizontalOverflow = HorizontalWrapMode.Overflow; UIKit.Size(txtRep.gameObject, 400);
             txtEvent = UIKit.Label(row, "", 20, UIKit.Accent); UIKit.Size(txtEvent.gameObject, -1, -1, 1);
             UIKit.Btn(row, "||", () => G.Speed = 0, null, 22, 52, 44);
             UIKit.Btn(row, ">", () => G.Speed = 1, null, 22, 52, 44);
@@ -154,15 +155,15 @@ namespace PizzaTycoon
 
             // bottom toolbar
             var tb = UIKit.Box(hud, UIKit.Panel, "Toolbar");
-            UIKit.Anchor(tb.rectTransform, new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0), new Vector2(12, 12), new Vector2(1010, 68));
+            UIKit.Anchor(tb.rectTransform, new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0), new Vector2(12, 12), new Vector2(1530, 68));
             var trow = UIKit.HBox(tb.transform, 8); UIKit.Stretch(trow, 10, 10, 8, 8);
-            string[] tabs = { "Рестораны", "Меню", "Персонал", "Финансы", "Рынок", "Конкуренты", "Новости" };
-            foreach (var tab in tabs) { var tt = tab; UIKit.Btn(trow, tab, () => OpenTab(tt), null, 19, 130, 52); }
+            string[] tabs = { "Рестораны", "Меню", "Персонал", "Интерьер", "Реклама", "Финансы", "Рынок", "Конкуренты", "Штаб", "Клиенты", "Новости" };
+            foreach (var tab in tabs) { var tt = tab; UIKit.Btn(trow, tab, () => OpenTab(tt), null, 16, 122, 52); }
 
             var sv = UIKit.Btn(hud, "Сохранить", () => { S.Save(1); Toast("Игра сохранена."); }, null, 20, 150, 52);
-            UIKit.Anchor((RectTransform)sv.transform, new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0), new Vector2(1036, 20), new Vector2(150, 52));
+            UIKit.Anchor((RectTransform)sv.transform, new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0), new Vector2(1552, 20), new Vector2(150, 52));
             var ms = UIKit.Btn(hud, "Цель", () => ShowGoal(), UIKit.Accent, 20, 100, 52);
-            UIKit.Anchor((RectTransform)ms.transform, new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0), new Vector2(1196, 20), new Vector2(100, 52));
+            UIKit.Anchor((RectTransform)ms.transform, new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0), new Vector2(1712, 20), new Vector2(100, 52));
 
             BuildSidebar();
             RefreshSidebar();
@@ -197,6 +198,12 @@ namespace PizzaTycoon
             Meter(content, "Население", d.population, new Color(0.4f, 0.7f, 0.95f));
             UIKit.Row(content, "Вкусы", TasteName(d.preference));
             UIKit.Row(content, "Аренда (коэф.)", d.rentFactor.ToString("0.00"));
+            var order = new List<int> { 0, 1, 2, 3, 4, 5, 6, 7 };
+            order.Sort((x, y) => d.mix[y].CompareTo(d.mix[x]));
+            UIKit.Label(content, "Клиенты района", 20, UIKit.TextCol, TextAnchor.MiddleLeft, FontStyle.Bold);
+            for (int k = 0; k < 3; k++) Meter(content, GameData.Groups[order[k]].name + " " + Mathf.RoundToInt(d.mix[order[k]] * 100) + "%", d.mix[order[k]] * 2f, GameData.Groups[order[k]].color);
+            UIKit.Row(content, "Любимый стиль главной группы", GameData.Styles[GameData.Groups[order[0]].liked[0]].name);
+            UIKit.Row(content, "Ваших ресторанов / лимит", S.RestaurantsOf(0).Count + " / " + GameState.MaxRestaurants(S.Player.hq));
 
             var present = S.restaurants.Where(r => r.district == di).ToList();
             UIKit.Label(content, "Рестораны в районе: " + present.Count + "/4", 22, UIKit.TextCol, TextAnchor.MiddleLeft, FontStyle.Bold);
@@ -286,11 +293,11 @@ namespace PizzaTycoon
             windowRoot = UIKit.Rect("Window", canvas.transform); UIKit.Stretch(windowRoot);
             var dim = windowRoot.gameObject.AddComponent<Image>(); dim.color = new Color(0, 0, 0, 0.45f);
             var panel = UIKit.Box(windowRoot, UIKit.Panel, "Panel");
-            UIKit.Anchor(panel.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 0), new Vector2(1180, 820));
+            UIKit.Anchor(panel.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 0), new Vector2(1560, 860));
             var tabs = UIKit.HBox(panel.transform, 6);
             UIKit.Anchor(tabs, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 1), new Vector2(0, -10), new Vector2(-24, 52));
-            string[] names = { "Рестораны", "Меню", "Персонал", "Финансы", "Рынок", "Конкуренты", "Новости" };
-            foreach (var n in names) { var nn = n; UIKit.Btn(tabs, n, () => { currentTab = nn; RebuildWindow(); }, null, 18, 140, 46); }
+            string[] names = { "Рестораны", "Меню", "Персонал", "Интерьер", "Реклама", "Финансы", "Рынок", "Конкуренты", "Штаб", "Клиенты", "Новости" };
+            foreach (var n in names) { var nn = n; UIKit.Btn(tabs, n, () => { currentTab = nn; RebuildWindow(); }, null, 16, 118, 46); }
             var close = UIKit.Btn(tabs, "X", () => CloseWindow(), UIKit.Bad, 20, 52, 46);
             RectTransform content;
             var sc = UIKit.Scroll(panel.transform, out content);
@@ -317,6 +324,10 @@ namespace PizzaTycoon
                 case "Рестораны": TabRestaurants(windowContent); break;
                 case "Меню": TabMenu(windowContent); break;
                 case "Персонал": TabStaff(windowContent); break;
+                case "Интерьер": TabInterior(windowContent); break;
+                case "Реклама": TabAds(windowContent); break;
+                case "Штаб": TabHq(windowContent); break;
+                case "Клиенты": TabClients(windowContent); break;
                 case "Финансы": TabFinance(windowContent); break;
                 case "Рынок": TabMarket(windowContent); break;
                 case "Конкуренты": TabCompetitors(windowContent); break;
@@ -356,6 +367,7 @@ namespace PizzaTycoon
                 UIKit.Row(v, GameData.Styles[r.style].name + ", " + GameData.Sizes[r.size].name + " (" + GameData.Sizes[r.size].seats + " мест)", "реп. " + Mathf.RoundToInt(r.reputation) + "  чист. " + Mathf.RoundToInt(r.cleanliness));
                 UIKit.Row(v, "Вчера: гостей " + r.last.customers + ", отказ " + r.last.unserved + ", пицц " + r.last.pizzas, "Прибыль " + UIKit.Money(r.last.Profit), r.last.Profit >= 0 ? UIKit.Good : UIKit.Bad);
                 UIKit.Row(v, "Всего: выручка " + UIKit.Money(r.total.revenue), "Дней: " + (S.day - r.openedDay));
+                UIKit.Row(v, "Гурманские звёзды: " + r.stars + (r.closedDays > 0 ? "   ЗАКРЫТ ещё " + r.closedDays + " дн." : ""), "оценка богачей " + Mathf.RoundToInt(r.rating[0] * 100) + "%");
                 var btns = UIKit.HBox(v, 8, 44);
                 UIKit.Btn(btns, "Выбрать", () => { G.SelectedRestaurant = rr.id; G.SelectDistrict(rr.district); Refresh(); }, UIKit.Accent, 18, 130, 40);
                 if (r.size < 2)
@@ -366,7 +378,7 @@ namespace PizzaTycoon
                 {
                     ConfirmClose(rr);
                 }, UIKit.Bad, 18, 110, 40);
-                UIKit.Size(card.gameObject, -1, 230);
+                UIKit.Size(card.gameObject, -1, 262);
             }
         }
 
@@ -394,7 +406,7 @@ namespace PizzaTycoon
                 var mm = m;
                 var card = UIKit.Box(c, UIKit.PanelLight, "Item", true);
                 var v = UIKit.VBox(card.transform, 4, 10); UIKit.Stretch(v);
-                float cost = S.ItemCost(m, r.supplier);
+                float cost = S.ItemCost(m, r);
                 float fair = Simulation.FairPrice(S, m, r);
                 float q = GameState.ItemQuality(m, r.supplier);
                 var head = UIKit.HBox(v, 8, 36);
@@ -425,6 +437,13 @@ namespace PizzaTycoon
                 b.interactable = !has;
             }
 
+            var sup = UIKit.Label(c, "Поставщик (лояльность: до -25% цены через 150 дней)", 26, UIKit.Accent, TextAnchor.MiddleLeft, FontStyle.Bold); UIKit.Size(sup.gameObject, -1, 40);
+            var sr = UIKit.HBox(c, 8, 50);
+            sr.GetComponent<HorizontalLayoutGroup>().childForceExpandWidth = true;
+            string[] sn = { "Дешёвый (-20% цена, -20% качество)", "Стандартный", "Премиум (+45% цена, +25% качество)" };
+            for (int i = 0; i < 3; i++) { int ii = i; UIKit.Btn(sr, sn[i], () => { Simulation.SetSupplier(r, ii); Refresh(); }, r.supplier == i ? UIKit.Accent : UIKit.PanelLight, 16, -1, 50); }
+            UIKit.Row(c, "Дней с этим поставщиком", r.supplierDays + "  (скидка " + Mathf.RoundToInt(GameState.Loyalty(r) * 100) + "%)");
+
             var dz = UIKit.Label(c, "Конструктор пиццы", 26, UIKit.Accent, TextAnchor.MiddleLeft, FontStyle.Bold); UIKit.Size(dz.gameObject, -1, 40);
             var ig = UIKit.Rect("Ingr", c);
             var igl = ig.gameObject.AddComponent<GridLayoutGroup>();
@@ -440,56 +459,15 @@ namespace PizzaTycoon
                     on ? UIKit.Good : UIKit.PanelLight, 16, 180, 44);
             }
             var tmp = new MenuItem(); tmp.ingredients.Add("dough"); tmp.ingredients.AddRange(designSel);
-            float dcost = S.ItemCost(tmp, r.supplier);
+            float dcost = S.ItemCost(tmp, r);
             UIKit.Row(c, "Себестоимость собственной пиццы", UIKit.Money(dcost) + ", качество " + Mathf.RoundToInt(GameState.ItemQuality(tmp, r.supplier) * 100) + "%");
             var create = UIKit.Btn(c, "Создать и добавить в меню", () =>
             {
                 var m = new MenuItem { name = "Авторская #" + (r.menu.Count + 1), ingredients = tmp.ingredients.ToList() };
-                m.price = Mathf.Round(S.ItemCost(m, r.supplier) * 3.6f * 10f) / 10f;
+                m.price = Mathf.Round(S.ItemCost(m, r.supplier) * 4.2f * 10f) / 10f;
                 r.menu.Add(m); designSel.Clear(); Refresh();
             }, UIKit.Good, 22, -1, 50);
             create.interactable = designSel.Count >= 2;
-        }
-
-        void TabStaff(Transform c)
-        {
-            var r = G.CurrentRestaurant();
-            if (r == null) { UIKit.Label(c, "Нет ресторанов.", 24, UIKit.Dim); return; }
-            var mine = S.RestaurantsOf(0);
-            int idx = mine.IndexOf(r);
-            var sw = UIKit.HBox(c, 10, 46);
-            UIKit.Btn(sw, "<", () => { G.SelectedRestaurant = mine[(idx + mine.Count - 1) % mine.Count].id; Refresh(); }, null, 22, 56, 42);
-            var nm = UIKit.Label(sw, r.name, 24, UIKit.Accent, TextAnchor.MiddleCenter, FontStyle.Bold); UIKit.Size(nm.gameObject, -1, -1, 1);
-            UIKit.Btn(sw, ">", () => { G.SelectedRestaurant = mine[(idx + 1) % mine.Count].id; Refresh(); }, null, 22, 56, 42);
-
-            var size = GameData.Sizes[r.size];
-            float wage = S.StaffWage(r.skill);
-            UIKit.Row(c, "Зарплата одного сотрудника в день", UIKit.Money(wage));
-            Stepper(c, "Повара (макс. " + size.kitchenSlots + ")", r.cooks.ToString(), () => { r.cooks--; Refresh(); }, () => { r.cooks++; Refresh(); }, r.cooks > 1, r.cooks < size.kitchenSlots);
-            Stepper(c, "Официанты", r.waiters.ToString(), () => { r.waiters--; Refresh(); }, () => { r.waiters++; Refresh(); }, r.waiters > 1, r.waiters < size.kitchenSlots + 2);
-            Stepper(c, "Квалификация (1-5)", r.skill.ToString(), () => { }, () => { }, false, false);
-            float trainCost = 600f * r.skill * (r.cooks + r.waiters) * 0.5f;
-            var tr = UIKit.Btn(c, "Обучить персонал: " + UIKit.Money(trainCost), () =>
-            {
-                if (S.Player.cash < trainCost) { Toast("Недостаточно денег."); return; }
-                S.Player.cash -= trainCost; r.skill++; Refresh();
-            }, UIKit.Good, 22, -1, 48);
-            tr.interactable = r.skill < 5;
-
-            var sup = UIKit.Label(c, "Поставщик", 26, UIKit.Accent, TextAnchor.MiddleLeft, FontStyle.Bold); UIKit.Size(sup.gameObject, -1, 40);
-            var sr = UIKit.HBox(c, 8, 50);
-            string[] sn = { "Дешёвый (-20% цена, -20% качество)", "Стандартный", "Премиум (+45% цена, +25% качество)" };
-            sr.GetComponent<HorizontalLayoutGroup>().childForceExpandWidth = true;
-            for (int i = 0; i < 3; i++) { int ii = i; UIKit.Btn(sr, sn[i], () => { r.supplier = ii; Refresh(); }, r.supplier == i ? UIKit.Accent : UIKit.PanelLight, 16, -1, 50); }
-
-            var mk = UIKit.Label(c, "Реклама", 26, UIKit.Accent, TextAnchor.MiddleLeft, FontStyle.Bold); UIKit.Size(mk.gameObject, -1, 40);
-            var mr = UIKit.HBox(c, 8, 50);
-            mr.GetComponent<HorizontalLayoutGroup>().childForceExpandWidth = true;
-            string[] mn = { "Нет", "Листовки", "Радио", "ТВ" };
-            for (int i = 0; i < 4; i++) { int ii = i; UIKit.Btn(mr, mn[i] + " " + UIKit.Money(Simulation.MarketingPrice(i)) + "/д", () => { r.marketing = ii; Refresh(); }, r.marketing == i ? UIKit.Accent : UIKit.PanelLight, 16, -1, 50); }
-
-            var cl = UIKit.Label(c, "Мощность: ~" + Mathf.RoundToInt(Mathf.Min(r.cooks * 95f, r.waiters * 85f, size.seats * 7f) * (0.8f + r.skill * 0.12f)) + " гостей в день", 20, UIKit.Dim);
-            UIKit.Size(cl.gameObject, -1, 34);
         }
 
         void TabFinance(Transform c)
@@ -543,7 +521,7 @@ namespace PizzaTycoon
 
         void TabMarket(Transform c)
         {
-            UIKit.Label(c, "Цены на ингредиенты в городе (за порцию). Изменения: относительно базовой цены.", 20, UIKit.Dim);
+            UIKit.Label(c, "Цены на ингредиенты в городе (за порцию). В моде: " + string.Join(", ", S.trend.Select(id => GameData.Ingredients.Find(x => x.id == id).name)) + " (+ к оценке блюда).", 20, UIKit.Dim);
             for (int i = 0; i < GameData.Ingredients.Count; i++)
             {
                 var ing = GameData.Ingredients[i];
@@ -565,7 +543,7 @@ namespace PizzaTycoon
                 var card = UIKit.Box(c, UIKit.PanelLight, "Card", true);
                 var v = UIKit.VBox(card.transform, 6, 14); UIKit.Stretch(v);
                 var t = UIKit.Label(v, co.name + (co.isPlayer ? " (вы)" : ""), 26, co.color, TextAnchor.MiddleLeft, FontStyle.Bold); UIKit.Size(t.gameObject, -1, 34);
-                UIKit.Row(v, "Ресторанов", rs.Count.ToString());
+                UIKit.Row(v, "Ресторанов / уровень штаба", rs.Count + " / " + co.hq + (rs.Sum(r => r.stars) > 0 ? "   звёзд: " + rs.Sum(r => r.stars) : ""));
                 UIKit.Row(v, "Средняя репутация", rs.Count == 0 ? "-" : Mathf.RoundToInt(rs.Average(r => r.reputation)).ToString());
                 UIKit.Row(v, "Гостей вчера", rs.Sum(r => r.last.customers).ToString());
                 UIKit.Row(v, "Средняя цена", rs.Count == 0 ? "-" : "$" + rs.SelectMany(r => r.menu).Where(m => m.enabled).DefaultIfEmpty(new MenuItem()).Average(m => m.price).ToString("0.0"));
@@ -588,11 +566,11 @@ namespace PizzaTycoon
         void ShowGoal()
         {
             var c = S.City;
-            var mine = S.RestaurantsOf(0);
-            float rep = mine.Count == 0 ? 0 : mine.Average(r => r.reputation);
-            Dialog("Цель города",
-                "Чтобы покорить " + c.name + ":\n• минимум 3 ресторана и 90 дней игры\n• средняя репутация " + c.goalReputation + " (сейчас " + Mathf.RoundToInt(rep) + ")\n• капитал " + UIKit.Money(c.goalCash) + " (сейчас " + UIKit.Money(S.Player.cash - S.Player.loan) + ")\n\nПокорено городов: " + S.citiesCompleted,
-                new[] { ("Закрыть", (Action)(() => CloseOverlay())) });
+            var sb = new System.Text.StringBuilder("Чтобы покорить " + c.name + " (не раньше 90-го дня):\n\n");
+            foreach (var o in c.objectives)
+                sb.Append(Simulation.IsDone(S, o) ? "[v] " : "[  ] ").Append(o.Text()).Append('\n');
+            sb.Append("\nПокорено городов: " + S.citiesCompleted);
+            Dialog("Задачи города", sb.ToString(), new[] { ("Закрыть", (Action)(() => CloseOverlay())) });
         }
 
         public void ShowBankrupt()
@@ -614,10 +592,10 @@ namespace PizzaTycoon
             overlay = UIKit.Rect("Overlay", canvas.transform); UIKit.Stretch(overlay);
             overlay.gameObject.AddComponent<Image>().color = new Color(0, 0, 0, 0.6f);
             var box = UIKit.Box(overlay, UIKit.Panel, "Dialog");
-            UIKit.Anchor(box.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(760, 480));
+            UIKit.Anchor(box.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(760, 580));
             var v = UIKit.VBox(box.transform, 14, 24); UIKit.Stretch(v);
             var t = UIKit.Label(v, title, 40, UIKit.Accent, TextAnchor.MiddleCenter, FontStyle.Bold); UIKit.Size(t.gameObject, -1, 60);
-            var b = UIKit.Label(v, body, 24, UIKit.TextCol, TextAnchor.UpperLeft); UIKit.Size(b.gameObject, -1, 220);
+            var b = UIKit.Label(v, body, 24, UIKit.TextCol, TextAnchor.UpperLeft); UIKit.Size(b.gameObject, -1, 300);
             foreach (var bt in buttons) UIKit.Btn(v, bt.Item1, bt.Item2, UIKit.Accent, 24, -1, 52);
         }
 

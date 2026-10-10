@@ -57,7 +57,7 @@ namespace PizzaTycoon
             float t0 = Time.time; int d0 = g.State.day;
             while (Time.time - t0 < 6f) yield return null;
             Debug.Log("[uitest] days advanced " + (g.State.day - d0));
-            foreach (var tab in new[] { "Рестораны", "Меню", "Персонал", "Финансы", "Рынок", "Конкуренты", "Новости" })
+            foreach (var tab in new[] { "Рестораны", "Меню", "Персонал", "Интерьер", "Реклама", "Финансы", "Рынок", "Конкуренты", "Штаб", "Клиенты", "Новости" })
             {
                 g.UI.OpenTab(tab); yield return null;
                 yield return ClickAll(); yield return null;

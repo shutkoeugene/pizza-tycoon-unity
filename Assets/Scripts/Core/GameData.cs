@@ -5,6 +5,39 @@ namespace PizzaTycoon
 {
     public enum Taste { Veg, Meat, Sea, Classic }
 
+    public enum Group { BigShots, Yuppies, Students, Kids, Teens, BlueCollar, Tourists, Goths }
+
+    public class GroupDef
+    {
+        public string name, desc;
+        public Taste taste;
+        public float priceLevel;      // multiplier of the "fair" price they are happy to pay
+        public float cheapPenalty;    // how suspicious they are of cheap food
+        public int[] liked, ok;       // interior style indices
+        public float guardSensitivity;
+        public Color color;
+    }
+
+    public enum ObjKind { Restaurants, Reputation, Capital, Stars, Hq, Outsell }
+
+    public class Objective
+    {
+        public ObjKind kind; public float value;
+        public Objective(ObjKind k, float v) { kind = k; value = v; }
+        public string Text()
+        {
+            switch (kind)
+            {
+                case ObjKind.Restaurants: return "Ресторанов: " + (int)value;
+                case ObjKind.Reputation: return "Средняя репутация: " + (int)value;
+                case ObjKind.Capital: return "Капитал: $" + ((int)value).ToString("N0");
+                case ObjKind.Stars: return "Гурманские звёзды: " + (int)value;
+                case ObjKind.Hq: return "Уровень штаба: " + (int)value;
+                default: return "Обойти лучшего конкурента по числу гостей";
+            }
+        }
+    }
+
     public class IngredientDef
     {
         public string id, name;
@@ -28,6 +61,7 @@ namespace PizzaTycoon
         public float rentFactor;
         public Taste preference;
         public Vector2Int cell;
+        public float[] mix = new float[8];   // share of each customer group
     }
 
     public class CityDef
@@ -37,8 +71,9 @@ namespace PizzaTycoon
         public float baseDemand = 1f;
         public float priceLevel = 1f;
         public Color accent;
-        public int goalReputation;  // reputation needed to finish city
+        public int goalReputation;  // kept for display/compat; real goals are in objectives
         public int goalCash;
+        public List<Objective> objectives = new List<Objective>();
         public List<DistrictDef> districts = new List<DistrictDef>();
     }
 
@@ -60,6 +95,19 @@ namespace PizzaTycoon
         public static readonly List<IngredientDef> Ingredients = new List<IngredientDef>();
         public static readonly List<RecipeDef> Recipes = new List<RecipeDef>();
         public static readonly List<CityDef> Cities = new List<CityDef>();
+
+        // style indices: 0 loft, 1 simple, 2 rustic, 3 modern, 4 elite
+        public static readonly GroupDef[] Groups =
+        {
+            new GroupDef { name = "Богачи",    desc = "Любят дорого и со вкусом; чувствительны к охране", taste = Taste.Classic, priceLevel = 1.35f, cheapPenalty = 0.8f, liked = new[]{4,3}, ok = new[]{2}, guardSensitivity = 1.0f, color = new Color(0.95f, 0.8f, 0.2f) },
+            new GroupDef { name = "Яппи",      desc = "Морепродукты и овощи, современный стиль",           taste = Taste.Sea,     priceLevel = 1.3f, cheapPenalty = 0.4f, liked = new[]{3,4}, ok = new[]{0,1}, guardSensitivity = 0.6f, color = new Color(0.4f, 0.7f, 1f) },
+            new GroupDef { name = "Студенты",  desc = "Дёшево и вегетарианское",                           taste = Taste.Veg,     priceLevel = 0.7f, cheapPenalty = 0.05f, liked = new[]{0,1}, ok = new[]{2}, guardSensitivity = 0.5f, color = new Color(0.5f, 0.85f, 0.5f) },
+            new GroupDef { name = "Дети",      desc = "Сладкие и простые пиццы, недорого",                 taste = Taste.Classic, priceLevel = 0.6f, cheapPenalty = 0.05f, liked = new[]{1,2}, ok = new[]{0,3}, guardSensitivity = 0.8f, color = new Color(1f, 0.6f, 0.8f) },
+            new GroupDef { name = "Подростки", desc = "Мясные пиццы, лофт и модерн",                       taste = Taste.Meat,    priceLevel = 0.8f, cheapPenalty = 0.1f, liked = new[]{0,3}, ok = new[]{1}, guardSensitivity = 0.9f, color = new Color(0.9f, 0.4f, 0.4f) },
+            new GroupDef { name = "Рабочие",   desc = "Сытное мясное, деревенский стиль, недорого",        taste = Taste.Meat,    priceLevel = 0.8f, cheapPenalty = 0.05f, liked = new[]{2,1}, ok = new[]{0}, guardSensitivity = 0.4f, color = new Color(0.7f, 0.55f, 0.35f) },
+            new GroupDef { name = "Туристы",   desc = "Классика и морепродукты, живописный стиль",         taste = Taste.Sea,     priceLevel = 1.1f, cheapPenalty = 0.3f, liked = new[]{2,4}, ok = new[]{1,3}, guardSensitivity = 0.7f, color = new Color(0.95f, 0.65f, 0.3f) },
+            new GroupDef { name = "Готы",      desc = "Овощи и необычное, лофт и деревенский стиль",       taste = Taste.Veg,     priceLevel = 0.9f, cheapPenalty = 0.1f, liked = new[]{0,2}, ok = new[]{3}, guardSensitivity = 0.9f, color = new Color(0.6f, 0.4f, 0.8f) },
+        };
 
         public static readonly StoreStyle[] Styles =
         {
@@ -103,6 +151,19 @@ namespace PizzaTycoon
             Ing("corn",    "Кукуруза",   0.25f, 0.5f, Taste.Veg,     new Color(1f, 0.9f, 0.1f));
             Ing("bacon",   "Бекон",      0.75f, 0.75f, Taste.Meat,   new Color(0.8f, 0.35f, 0.3f));
             Ing("prosc",   "Прошутто",   1.20f, 0.95f, Taste.Meat,   new Color(0.85f, 0.35f, 0.4f));
+            Ing("sardine", "Сардины",    0.55f, 0.6f, Taste.Sea,     new Color(0.6f, 0.65f, 0.7f));
+            Ing("caviar",  "Икра",       2.00f, 1.0f, Taste.Sea,     new Color(0.15f, 0.12f, 0.12f));
+            Ing("banana",  "Банан",      0.35f, 0.5f, Taste.Classic, new Color(1f, 0.95f, 0.5f));
+            Ing("chili",   "Чили",       0.30f, 0.6f, Taste.Meat,    new Color(0.85f, 0.1f, 0.05f));
+            Ing("oregano", "Орегано",    0.20f, 0.7f, Taste.Classic, new Color(0.25f, 0.5f, 0.2f));
+            Ing("mozz",    "Моцарелла",  0.80f, 0.9f, Taste.Classic, new Color(0.98f, 0.98f, 0.9f));
+            Ing("eggplant","Баклажан",   0.35f, 0.6f, Taste.Veg,     new Color(0.35f, 0.15f, 0.4f));
+            Ing("artichok","Артишоки",   0.85f, 0.85f, Taste.Veg,    new Color(0.4f, 0.55f, 0.35f));
+            Ing("sausage", "Колбаски",   0.60f, 0.65f, Taste.Meat,   new Color(0.75f, 0.35f, 0.25f));
+            Ing("squid",   "Кальмар",    1.00f, 0.85f, Taste.Sea,    new Color(0.9f, 0.85f, 0.8f));
+            Ing("rucola",  "Руккола",    0.40f, 0.75f, Taste.Veg,    new Color(0.2f, 0.55f, 0.15f));
+            Ing("gorgon",  "Горгонзола", 0.90f, 0.85f, Taste.Classic,new Color(0.8f, 0.85f, 0.9f));
+            Ing("beef",    "Говядина",   0.95f, 0.8f, Taste.Meat,    new Color(0.55f, 0.2f, 0.15f));
 
             Rec("margh",  "Маргарита",        "dough", "tomato", "cheese", "basil");
             Rec("funghi", "Фунги",            "dough", "tomato", "cheese", "mush");
@@ -114,6 +175,15 @@ namespace PizzaTycoon
             Rec("veg",    "Вегетарианская",   "dough", "tomato", "cheese", "pepper", "corn", "spinach", "onion");
             Rec("prosc",  "Прошутто",         "dough", "tomato", "cheese", "prosc", "basil");
             Rec("meat",   "Мясная",           "dough", "tomato", "cheese", "salami", "bacon", "ham");
+            Rec("diavola","Дьявола",          "dough", "tomato", "cheese", "salami", "chili", "onion");
+            Rec("sardin", "Сардина",          "dough", "tomato", "cheese", "sardine", "olive", "oregano");
+            Rec("bufala", "Буфала",           "dough", "tomato", "mozz", "basil", "oregano");
+            Rec("gourmet","Гурман",           "dough", "tomato", "mozz", "prosc", "rucola", "artichok");
+            Rec("caviar", "Королевская",      "dough", "mozz", "caviar", "shrimp", "squid");
+            Rec("fruit",  "Фруктовая",        "dough", "tomato", "cheese", "banana", "pine", "corn");
+            Rec("sausage","Колбасная",        "dough", "tomato", "cheese", "sausage", "pepper", "onion");
+            Rec("quattro","Четыре сыра",      "dough", "mozz", "gorgon", "cheese", "basil");
+            Rec("eggp",   "Баклажанная",      "dough", "tomato", "cheese", "eggplant", "basil", "olive");
 
             BuildCities();
         }
@@ -134,7 +204,41 @@ namespace PizzaTycoon
                     cell = new Vector2Int(i % 4, i / 4)
                 });
             }
+            foreach (var d in c.districts) d.mix = MixFor(d);
             Cities.Add(c);
+        }
+
+        static bool Has(string n, params string[] keys) { foreach (var k in keys) if (n.Contains(k)) return true; return false; }
+
+        public static float[] MixFor(DistrictDef d)
+        {
+            float w = d.wealth, p = d.population;
+            var m = new float[8];
+            m[(int)Group.BigShots] = 1.3f * Mathf.Pow(w, 2.2f);
+            m[(int)Group.Yuppies] = 0.4f + 0.7f * w * p;
+            m[(int)Group.Students] = 0.1f + 0.5f * (1 - w) * p;
+            m[(int)Group.Kids] = 0.35f * (1 - w * 0.6f);
+            m[(int)Group.Teens] = 0.1f + 0.45f * (1 - w * 0.5f) * p;
+            m[(int)Group.BlueCollar] = 0.8f * (1 - w);
+            m[(int)Group.Tourists] = 0.15f + 0.4f * w;
+            m[(int)Group.Goths] = 0.12f + 0.1f * (1 - w);
+            switch (d.preference)
+            {
+                case Taste.Veg: m[(int)Group.Students] *= 1.6f; m[(int)Group.Goths] *= 1.5f; m[(int)Group.Yuppies] *= 1.2f; break;
+                case Taste.Meat: m[(int)Group.BlueCollar] *= 1.6f; m[(int)Group.Teens] *= 1.5f; break;
+                case Taste.Sea: m[(int)Group.Tourists] *= 1.6f; m[(int)Group.Yuppies] *= 1.3f; break;
+                default: m[(int)Group.Kids] *= 1.4f; m[(int)Group.BigShots] *= 1.2f; m[(int)Group.Tourists] *= 1.2f; break;
+            }
+            string n = d.name;
+            if (Has(n, "Универс", "Латин", "Кройцберг", "Ньютаун")) m[(int)Group.Students] *= 2.5f;
+            if (Has(n, "Порт", "Док", "Речной", "Вокзал", "Фавела", "Бронкс", "Бельвиль", "Окраина", "Пригород", "Бутово", "Вальекас", "Брикстон")) m[(int)Group.BlueCollar] *= 2f;
+            if (Has(n, "Сити", "Дефанс", "Уолл", "Центр", "Чамартин")) { m[(int)Group.Yuppies] *= 2.2f; m[(int)Group.BigShots] *= 1.5f; }
+            if (Has(n, "Ватикан", "Манхэттен", "Бухта", "Рокс", "Монмартр", "Елисейские", "Тверская", "Арбат", "Копакабана", "Гиндза", "Соль")) m[(int)Group.Tourists] *= 2f;
+            if (Has(n, "Парк", "Ретиро", "Груневальд", "Уимблдон", "Мэнли")) m[(int)Group.Kids] *= 1.6f;
+            if (Has(n, "Сохо", "Кэмден", "Сибуя", "Акихабара", "Лапа", "Ла-Латина", "Роппонги")) { m[(int)Group.Teens] *= 1.8f; m[(int)Group.Goths] *= 1.8f; }
+            float sum = 0; foreach (var x in m) sum += x;
+            for (int i = 0; i < m.Length; i++) m[i] /= sum;
+            return m;
         }
 
         static void BuildCities()
@@ -169,6 +273,30 @@ namespace PizzaTycoon
             City("tok", "Токио", 1.25f, 1.3f, new Color(0.9f, 0.3f, 0.5f), 66, 180000,
                 ("Гиндза", 1f, .8f, Taste.Classic), ("Сибуя", .7f, 1f, Taste.Veg), ("Синдзюку", .8f, 1f, Taste.Meat), ("Акихабара", .5f, .9f, Taste.Classic),
                 ("Цукидзи", .6f, .6f, Taste.Sea), ("Асакуса", .5f, .7f, Taste.Sea), ("Роппонги", .9f, .6f, Taste.Meat), ("Икебукуро", .5f, .9f, Taste.Veg));
+
+            Obj("rom", R(3), Rep(40), Cap(30000));
+            Obj("par", R(3), Rep(50), Stars(1), Cap(40000));
+            Obj("lon", R(4), Rep(55), Cap(55000), Outsell());
+            Obj("ber", R(4), Rep(60), Hq(3), Cap(60000));
+            Obj("mad", R(4), Rep(62), Stars(1), Cap(70000));
+            Obj("mos", R(5), Rep(65), Hq(3), Cap(85000));
+            Obj("yor", R(5), Rep(66), Stars(1), Outsell(), Cap(110000));
+            Obj("rio", R(5), Rep(68), Stars(1), Hq(4), Cap(120000));
+            Obj("syd", R(6), Rep(70), Stars(2), Cap(140000));
+            Obj("tok", R(6), Rep(72), Stars(2), Hq(4), Cap(180000));
+        }
+
+        static Objective R(float v) => new Objective(ObjKind.Restaurants, v);
+        static Objective Rep(float v) => new Objective(ObjKind.Reputation, v);
+        static Objective Cap(float v) => new Objective(ObjKind.Capital, v);
+        static Objective Stars(float v) => new Objective(ObjKind.Stars, v);
+        static Objective Hq(float v) => new Objective(ObjKind.Hq, v);
+        static Objective Outsell() => new Objective(ObjKind.Outsell, 1);
+        static void Obj(string id, params Objective[] os)
+        {
+            var c = Cities.Find(x => x.id == id);
+            c.objectives.AddRange(os);
+            foreach (var o in os) { if (o.kind == ObjKind.Reputation) c.goalReputation = (int)o.value; if (o.kind == ObjKind.Capital) c.goalCash = (int)o.value; }
         }
     }
 }
