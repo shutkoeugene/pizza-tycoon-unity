@@ -86,7 +86,7 @@ namespace PizzaTycoon
 
             var col = UIKit.VBox(mainMenu, 14, 0);
             UIKit.Anchor(col, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(560, 700));
-            var t = UIKit.Label(col, "МАГНАТ ПИЦЦЫ", 54, UIKit.Accent, TextAnchor.MiddleCenter, FontStyle.Bold);
+            var t = UIKit.Label(col, "PIZZA TYCOON", 64, UIKit.Accent, TextAnchor.MiddleCenter, FontStyle.Bold);
             UIKit.Size(t.gameObject, -1, 100);
             var sub = UIKit.Label(col, "Построй пиццерийную империю в десяти городах мира", 22, UIKit.Dim, TextAnchor.MiddleCenter);
             UIKit.Size(sub.gameObject, -1, 40);
