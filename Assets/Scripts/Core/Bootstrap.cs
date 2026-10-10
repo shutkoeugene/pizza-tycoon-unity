@@ -9,6 +9,7 @@ namespace PizzaTycoon
         {
             if (Object.FindObjectOfType<GameController>() != null) return;
             Application.targetFrameRate = 60;
+            Application.runInBackground = true;
             var cam = Camera.main;
             if (cam == null)
             {
