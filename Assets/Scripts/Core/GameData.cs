@@ -45,6 +45,7 @@ namespace PizzaTycoon
         public float quality;   // 0..1
         public Taste taste;
         public Color color;
+        public bool exotic;     // insects, snake, kangaroo: loved by goths/teens, shunned by the rich
     }
 
     public class RecipeDef
@@ -125,8 +126,8 @@ namespace PizzaTycoon
             new StoreSize { id = "gross",  name = "Большой", seats = 40, kitchenSlots = 6, rent = 480, buildCost = 17000 },
         };
 
-        static void Ing(string id, string name, float cost, float q, Taste t, Color c)
-            => Ingredients.Add(new IngredientDef { id = id, name = name, cost = cost, quality = q, taste = t, color = c });
+        static void Ing(string id, string name, float cost, float q, Taste t, Color c, bool exotic = false)
+            => Ingredients.Add(new IngredientDef { id = id, name = name, cost = cost, quality = q, taste = t, color = c, exotic = exotic });
 
         static void Rec(string id, string name, params string[] ing)
             => Recipes.Add(new RecipeDef { id = id, name = name, ingredients = ing });
@@ -164,6 +165,18 @@ namespace PizzaTycoon
             Ing("rucola",  "Руккола",    0.40f, 0.75f, Taste.Veg,    new Color(0.2f, 0.55f, 0.15f));
             Ing("gorgon",  "Горгонзола", 0.90f, 0.85f, Taste.Classic,new Color(0.8f, 0.85f, 0.9f));
             Ing("beef",    "Говядина",   0.95f, 0.8f, Taste.Meat,    new Color(0.55f, 0.2f, 0.15f));
+            Ing("ants",    "Муравьи",    0.25f, 0.4f, Taste.Veg,     new Color(0.2f, 0.1f, 0.05f), true);
+            Ing("snake",   "Змея",       1.00f, 0.6f, Taste.Meat,    new Color(0.4f, 0.5f, 0.2f), true);
+            Ing("kangaroo","Кенгуру",    1.10f, 0.8f, Taste.Meat,    new Color(0.6f, 0.3f, 0.2f), true);
+            Ing("locust",  "Саранча",    0.30f, 0.4f, Taste.Veg,     new Color(0.6f, 0.55f, 0.2f), true);
+            Ing("maggots", "Личинки",    0.20f, 0.3f, Taste.Meat,    new Color(0.95f, 0.92f, 0.8f), true);
+            Ing("cockles", "Сердцевидки",0.70f, 0.7f, Taste.Sea,     new Color(0.85f, 0.8f, 0.7f));
+            Ing("octopus", "Осьминог",   1.00f, 0.85f, Taste.Sea,    new Color(0.7f, 0.35f, 0.4f));
+            Ing("crab",    "Краб",       1.30f, 0.9f, Taste.Sea,     new Color(0.9f, 0.4f, 0.3f));
+            Ing("lobster", "Омар",       2.20f, 1.0f, Taste.Sea,     new Color(0.85f, 0.2f, 0.15f));
+            Ing("mussels", "Мидии",      0.60f, 0.7f, Taste.Sea,     new Color(0.25f, 0.25f, 0.35f));
+            Ing("bamboo",  "Бамбук",     0.30f, 0.6f, Taste.Veg,     new Color(0.7f, 0.8f, 0.4f));
+            Ing("goatch",  "Козий сыр",  0.90f, 0.8f, Taste.Classic, new Color(0.95f, 0.95f, 0.85f));
 
             Rec("margh",  "Маргарита",        "dough", "tomato", "cheese", "basil");
             Rec("funghi", "Фунги",            "dough", "tomato", "cheese", "mush");
@@ -184,6 +197,11 @@ namespace PizzaTycoon
             Rec("sausage","Колбасная",        "dough", "tomato", "cheese", "sausage", "pepper", "onion");
             Rec("quattro","Четыре сыра",      "dough", "mozz", "gorgon", "cheese", "basil");
             Rec("eggp",   "Баклажанная",      "dough", "tomato", "cheese", "eggplant", "basil", "olive");
+            Rec("snakep", "Змеиная",          "dough", "tomato", "cheese", "snake", "chili", "onion");
+            Rec("antp",   "Муравьиная",       "dough", "tomato", "cheese", "ants", "olive", "oregano");
+            Rec("outback","Австралийская",    "dough", "tomato", "cheese", "kangaroo", "pepper", "corn");
+            Rec("bugs",   "Хруст",            "dough", "tomato", "cheese", "locust", "maggots", "ants");
+            Rec("octo",   "Осьминожья",       "dough", "tomato", "mozz", "octopus", "cockles", "mussels");
 
             BuildCities();
         }

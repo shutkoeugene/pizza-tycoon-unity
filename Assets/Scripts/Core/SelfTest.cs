@@ -37,6 +37,15 @@ namespace PizzaTycoon
                 if (l == null || l.day != g.State.day) { Debug.LogError("[selftest] save/load mismatch"); }
                 if (g.State.won) { Simulation.AdvanceCity(g.State); g.RefreshWorld(); yield return null; }
             }
+            // exotic toppings: goths love them, the rich recoil
+            g.StartNew(0, "Exo"); yield return null;
+            Simulation.Build(g.State, 0, 1, 1);
+            var er = g.State.RestaurantsOf(0)[0];
+            er.menu.Clear(); er.menu.Add(g.State.DefaultItem("margh"));
+            float gothN = Simulation.MenuScore(g.State, er, (int)Group.Goths), bigN = Simulation.MenuScore(g.State, er, (int)Group.BigShots);
+            er.menu.Clear(); er.menu.Add(g.State.DefaultItem("snakep"));
+            float gothE = Simulation.MenuScore(g.State, er, (int)Group.Goths), bigE = Simulation.MenuScore(g.State, er, (int)Group.BigShots);
+            Debug.Log("[selftest] exotic goths " + gothN.ToString("0.00") + "->" + gothE.ToString("0.00") + " bigshots " + bigN.ToString("0.00") + "->" + bigE.ToString("0.00") + " exoticCount=" + Simulation.ExoticCount(er));
             Debug.Log("[selftest] DONE errors=" + errors);
             Application.Quit();
         }

@@ -445,6 +445,7 @@ namespace PizzaTycoon
             UIKit.Row(c, "Дней с этим поставщиком", r.supplierDays + "  (скидка " + Mathf.RoundToInt(GameState.Loyalty(r) * 100) + "%)");
 
             var dz = UIKit.Label(c, "Конструктор пиццы", 26, UIKit.Accent, TextAnchor.MiddleLeft, FontStyle.Bold); UIKit.Size(dz.gameObject, -1, 40);
+            var ex = UIKit.Label(c, "* Экзотика (муравьи, змея, кенгуру, саранча, личинки): готы и подростки в восторге, богатые и дети в ужасе; санинспекция заглядывает чаще.", 16, UIKit.Dim); UIKit.Size(ex.gameObject, -1, 44);
             var ig = UIKit.Rect("Ingr", c);
             var igl = ig.gameObject.AddComponent<GridLayoutGroup>();
             igl.cellSize = new Vector2(180, 44); igl.spacing = new Vector2(8, 8);
@@ -455,7 +456,7 @@ namespace PizzaTycoon
                 var ii = ingr;
                 if (ii.id == "dough") continue;
                 bool on = designSel.Contains(ii.id);
-                UIKit.Btn(ig, ii.name + " " + S.IngredientCost(ii.id, r.supplier).ToString("0.00"), () => { if (on) designSel.Remove(ii.id); else designSel.Add(ii.id); Refresh(); },
+                UIKit.Btn(ig, ii.name + (ii.exotic ? "*" : "") + " " + S.IngredientCost(ii.id, r.supplier).ToString("0.00"), () => { if (on) designSel.Remove(ii.id); else designSel.Add(ii.id); Refresh(); },
                     on ? UIKit.Good : UIKit.PanelLight, 16, 180, 44);
             }
             var tmp = new MenuItem(); tmp.ingredients.Add("dough"); tmp.ingredients.AddRange(designSel);
@@ -529,7 +530,7 @@ namespace PizzaTycoon
                 float ratio = S.ingredientMul[i];
                 var h = UIKit.HBox(c, 10, 38);
                 var sw = UIKit.Box(h, ing.color, "sw", true); UIKit.Size(sw.gameObject, 26, 26);
-                var l = UIKit.Label(h, ing.name + "   (" + TasteName(ing.taste) + ", кач. " + Mathf.RoundToInt(ing.quality * 100) + "%)", 22); UIKit.Size(l.gameObject, -1, -1, 1);
+                var l = UIKit.Label(h, ing.name + (ing.exotic ? " [экзотика]" : "") + "   (" + TasteName(ing.taste) + ", кач. " + Mathf.RoundToInt(ing.quality * 100) + "%)", 22); UIKit.Size(l.gameObject, -1, -1, 1);
                 var p = UIKit.Label(h, "$" + cost.ToString("0.00"), 22, UIKit.TextCol, TextAnchor.MiddleRight, FontStyle.Bold); UIKit.Size(p.gameObject, 100);
                 var d = UIKit.Label(h, (ratio >= 1 ? "+" : "") + Mathf.RoundToInt((ratio - 1) * 100) + "%", 22, ratio > 1.1f ? UIKit.Bad : (ratio < 0.92f ? UIKit.Good : UIKit.Dim), TextAnchor.MiddleRight); UIKit.Size(d.gameObject, 80);
             }

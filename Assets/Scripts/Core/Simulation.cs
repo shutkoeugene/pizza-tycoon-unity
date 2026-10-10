@@ -38,8 +38,32 @@ namespace PizzaTycoon
                 if (ing.taste == grp.taste) match += 0.12f;
                 if (ing.taste == d.preference) match += 0.04f;
                 if (g.trend.Contains(id)) match += 0.05f;
+                if (ing.exotic) match += ExoticReaction(gi);
             }
             return Mathf.Min(match, 1.15f);
+        }
+
+        // exotic toppings (insects, snake, kangaroo): goths and teens love them, the rich and the kids recoil
+        public static float ExoticReaction(int gi)
+        {
+            switch ((Group)gi)
+            {
+                case Group.Goths: return 0.15f;
+                case Group.Teens: return 0.10f;
+                case Group.Students: return 0.04f;
+                case Group.Tourists: return 0.0f;
+                case Group.BlueCollar: return -0.06f;
+                case Group.Yuppies: return -0.08f;
+                case Group.Kids: return -0.12f;
+                default: return -0.18f;   // big shots
+            }
+        }
+
+        public static int ExoticCount(Restaurant r)
+        {
+            int n = 0;
+            foreach (var m in r.menu) if (m.enabled) foreach (var id in m.ingredients) if (GameData.Ingredients.Find(x => x.id == id).exotic) { n++; break; }
+            return n;
         }
 
         public static float PriceScore(GameState g, MenuItem m, Restaurant r, int gi)
@@ -362,7 +386,10 @@ namespace PizzaTycoon
                     g.companies[r.owner].cash -= cost; r.reputation = Mathf.Max(0, r.reputation - 3);
                     if (mine) g.AddNews("Рэкетиры разгромили зал в «" + r.name + "»: убыток " + UIKit.Money(cost) + ". Наймите охрану.");
                 }
-                if (rng.NextDouble() < 0.012f && r.cleanliness < 60f && g.companies[r.owner].mayor < 2)
+                int exo = ExoticCount(r);
+                float inspectP = 0.012f * (1 + exo);
+                float inspectBelow = exo > 0 ? 80f : 60f;   // exotic menus attract inspectors
+                if (rng.NextDouble() < inspectP && r.cleanliness < inspectBelow && g.companies[r.owner].mayor < 2)
                 {
                     float fine = 600 + (float)rng.NextDouble() * 400;
                     g.companies[r.owner].cash -= fine; r.reputation = Mathf.Max(0, r.reputation - 4);
