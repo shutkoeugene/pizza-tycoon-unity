@@ -14,9 +14,9 @@ namespace PizzaTycoon
         public static readonly float[] WarehouseCost = { 0, 6000, 12000 };
         static readonly float[] WageMotivation = { 30f, 55f, 80f, 95f };
 
-        public static readonly string[] SabotageNames = { "Подбросить крыс", "Вызвать санинспекцию", "Налёт полиции", "Нанять головорезов", "Поджог" };
-        public static readonly float[] SabotageCost = { 800, 500, 1500, 3500, 9000 };
-        public static readonly int[] SabotageHq = { 3, 1, 3, 3, 4 };
+        public static readonly string[] SabotageNames = { "Подбросить крыс", "Вызвать санинспекцию", "Налёт полиции", "Нанять головорезов", "Поджог", "Бомба" };
+        public static readonly float[] SabotageCost = { 800, 500, 1500, 3500, 9000, 5000 };
+        public static readonly int[] SabotageHq = { 3, 1, 3, 3, 4, 3 };
 
         public static float MarketingPrice(int level) => AdCost[level];
         public static int GuardsNeeded(Restaurant r) => r.size + 1;
@@ -456,7 +456,7 @@ namespace PizzaTycoon
                     var targets = g.RestaurantsOf(0);
                     if (targets.Count > 0)
                     {
-                        int kind = rng.Next(0, c.hq >= 4 && c.aggression > 1.2f ? 5 : 3);
+                        int kind = rng.Next(0, c.hq >= 4 && c.aggression > 1.2f ? 6 : 3);
                         Sabotage(g, ci, targets[rng.Next(targets.Count)], kind);
                     }
                 }
@@ -661,6 +661,11 @@ namespace PizzaTycoon
                         else { target.closedDays = Mathf.Max(target.closedDays, 3); target.reputation = Mathf.Max(0, target.reputation - 8); victimMsg = "Полиция устроила налёт на «" + target.name + "»."; result = "Налёт полиции удался."; }
                         break;
                     case 3: target.motivation = Mathf.Max(-20, target.motivation - 35); target.health = Mathf.Max(10, target.health - 25); target.cleanliness = Mathf.Max(20, target.cleanliness - 20); target.reputation = Mathf.Max(0, target.reputation - 8); target.closedDays = Mathf.Max(target.closedDays, 1); victimMsg = "Головорезы напали на персонал «" + target.name + "»."; result = "Головорезы поработали."; break;
+                    case 5:
+                        target.closedDays = Mathf.Max(target.closedDays, 8); target.condition = Mathf.Max(15, target.condition - 45);
+                        target.health = Mathf.Max(10, target.health - 30); target.cleanliness = Mathf.Max(20, target.cleanliness - 30);
+                        target.reputation = Mathf.Max(0, target.reputation - 15);
+                        victimMsg = "Взрыв в «" + target.name + "»! Зал разрушен, есть пострадавшие."; result = "Бомба взорвалась."; break;
                     default: target.closedDays = Mathf.Max(target.closedDays, 12); target.condition = Mathf.Max(15, target.condition - 60); target.reputation = Mathf.Max(0, target.reputation - 20); victimMsg = "Пожар в «" + target.name + "»!"; result = "Ресторан подожжён."; break;
                 }
             }

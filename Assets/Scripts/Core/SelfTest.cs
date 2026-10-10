@@ -46,6 +46,12 @@ namespace PizzaTycoon
             er.menu.Clear(); er.menu.Add(g.State.DefaultItem("snakep"));
             float gothE = Simulation.MenuScore(g.State, er, (int)Group.Goths), bigE = Simulation.MenuScore(g.State, er, (int)Group.BigShots);
             Debug.Log("[selftest] exotic goths " + gothN.ToString("0.00") + "->" + gothE.ToString("0.00") + " bigshots " + bigN.ToString("0.00") + "->" + bigE.ToString("0.00") + " exoticCount=" + Simulation.ExoticCount(er));
+            // bomb sent to a competitor
+            var bomber = g.State; bomber.Player.hq = 3; bomber.Player.cash = 50000;
+            var victim = bomber.restaurants.Find(x => x.owner != 0);
+            string msg = null;
+            for (int t = 0; t < 12 && (victim.closedDays == 0); t++) { bomber.day++; msg = Simulation.Sabotage(bomber, 0, victim, 5); }
+            Debug.Log("[selftest] bomb: " + msg + " closedDays=" + victim.closedDays + " rep=" + Mathf.RoundToInt(victim.reputation));
             Debug.Log("[selftest] DONE errors=" + errors);
             Application.Quit();
         }
