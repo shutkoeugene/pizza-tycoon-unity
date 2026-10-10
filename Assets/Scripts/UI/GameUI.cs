@@ -202,8 +202,8 @@ namespace PizzaTycoon
             order.Sort((x, y) => d.mix[y].CompareTo(d.mix[x]));
             UIKit.Label(content, "Клиенты района", 20, UIKit.TextCol, TextAnchor.MiddleLeft, FontStyle.Bold);
             for (int k = 0; k < 3; k++) Meter(content, GameData.Groups[order[k]].name + " " + Mathf.RoundToInt(d.mix[order[k]] * 100) + "%", d.mix[order[k]] * 2f, GameData.Groups[order[k]].color);
-            UIKit.Row(content, "Любимый стиль главной группы", GameData.Styles[GameData.Groups[order[0]].liked[0]].name);
-            UIKit.Row(content, "Ваших ресторанов / лимит", S.RestaurantsOf(0).Count + " / " + GameState.MaxRestaurants(S.Player.hq));
+            UIKit.Row(content, "Любимый стиль", GameData.Styles[GameData.Groups[order[0]].liked[0]].name);
+            UIKit.Row(content, "Ваши / лимит", S.RestaurantsOf(0).Count + " / " + GameState.MaxRestaurants(S.Player.hq));
 
             var present = S.restaurants.Where(r => r.district == di).ToList();
             UIKit.Label(content, "Рестораны в районе: " + present.Count + "/4", 22, UIKit.TextCol, TextAnchor.MiddleLeft, FontStyle.Bold);

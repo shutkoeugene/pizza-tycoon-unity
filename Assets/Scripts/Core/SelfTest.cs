@@ -86,7 +86,8 @@ namespace PizzaTycoon
             if (shotPath != null)
             {
                 Simulation.Build(g.State, 3, 4, 2); g.RefreshWorld(); g.SelectDistrict(0);
-                g.Speed = 0; g.DayTime = g.DayLength * 0.45f; g.Rig.FocusOn(g.City.DistrictCenter(0) + new Vector3(10f, 0, 8f), 62f);
+                g.Speed = 0; g.DayTime = g.DayLength * 0.45f; float sd = 62f; foreach (var a2 in System.Environment.GetCommandLineArgs()) if (a2.StartsWith("-shotdist=")) sd = float.Parse(a2.Substring(10), System.Globalization.CultureInfo.InvariantCulture);
+                g.Rig.FocusOn(g.City.DistrictCenter(0) + new Vector3(10f, 0, 8f), sd);
                 yield return new WaitForSecondsRealtime(4f);
                 ScreenCapture.CaptureScreenshot(shotPath); yield return new WaitForSecondsRealtime(2f); Application.Quit();
             }

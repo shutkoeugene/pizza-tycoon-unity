@@ -33,6 +33,7 @@ namespace PizzaTycoon
             GameController.I = gc;
             rig.Init(Vector3.zero, new Vector3(-20, 0, -20), new Vector3(120, 0, 120));
             ui.Init();
+            foreach (var a in System.Environment.GetCommandLineArgs()) if (a == "-modelinfo") { var mi = root.AddComponent<ModelInfo>(); mi.StartCoroutine(mi.Run()); }
             foreach (var a in System.Environment.GetCommandLineArgs()) if (a.StartsWith("-uidump=")) { var ud = root.AddComponent<UiDump>(); ud.path = a.Substring(8); }
             foreach (var a in System.Environment.GetCommandLineArgs()) if (a == "-playtest") { var pt = root.AddComponent<PlayTest>(); pt.StartCoroutine(pt.Run()); }
             foreach (var a in System.Environment.GetCommandLineArgs()) if (a == "-uitest") { var ut = root.AddComponent<UiTest>(); ut.StartCoroutine(ut.Run()); }

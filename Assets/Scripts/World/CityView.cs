@@ -61,7 +61,7 @@ namespace PizzaTycoon
     public class CityView : MonoBehaviour
     {
         public const float Cell = 26f;
-        public const float Plot = 20f;
+        public const float Plot = 19.5f;
 
         Transform root;
         Light sun;
@@ -155,17 +155,21 @@ namespace PizzaTycoon
             var line = Mats.Get(new Color(0.9f, 0.85f, 0.4f), 0.1f);
             float x0 = -Cell * 0.5f, x1 = (city.districtsX - 0.5f) * Cell;
             float z0 = -Cell * 0.5f, z1 = (city.districtsY - 0.5f) * Cell;
-            for (int i = 0; i <= city.districtsX; i++)
+            if (Kenney.Available) BuildRoadsKenney(city, x0, x1, z0, z1);
+            else
             {
-                float x = x0 + i * Cell;
-                Prim(PrimitiveType.Cube, root, new Vector3(x, 0.02f, (z0 + z1) * 0.5f), new Vector3(Cell - Plot, 0.05f, z1 - z0 + (Cell - Plot)), asphalt);
-                Prim(PrimitiveType.Cube, root, new Vector3(x, 0.06f, (z0 + z1) * 0.5f), new Vector3(0.2f, 0.02f, z1 - z0), line);
-            }
-            for (int j = 0; j <= city.districtsY; j++)
-            {
-                float z = z0 + j * Cell;
-                Prim(PrimitiveType.Cube, root, new Vector3((x0 + x1) * 0.5f, 0.02f, z), new Vector3(x1 - x0 + (Cell - Plot), 0.05f, Cell - Plot), asphalt);
-                Prim(PrimitiveType.Cube, root, new Vector3((x0 + x1) * 0.5f, 0.06f, z), new Vector3(x1 - x0, 0.02f, 0.2f), line);
+                for (int i = 0; i <= city.districtsX; i++)
+                {
+                    float x = x0 + i * Cell;
+                    Prim(PrimitiveType.Cube, root, new Vector3(x, 0.02f, (z0 + z1) * 0.5f), new Vector3(Cell - Plot, 0.05f, z1 - z0 + (Cell - Plot)), asphalt);
+                    Prim(PrimitiveType.Cube, root, new Vector3(x, 0.06f, (z0 + z1) * 0.5f), new Vector3(0.2f, 0.02f, z1 - z0), line);
+                }
+                for (int j = 0; j <= city.districtsY; j++)
+                {
+                    float z = z0 + j * Cell;
+                    Prim(PrimitiveType.Cube, root, new Vector3((x0 + x1) * 0.5f, 0.02f, z), new Vector3(x1 - x0 + (Cell - Plot), 0.05f, Cell - Plot), asphalt);
+                    Prim(PrimitiveType.Cube, root, new Vector3((x0 + x1) * 0.5f, 0.06f, z), new Vector3(x1 - x0, 0.02f, 0.2f), line);
+                }
             }
 
             // traffic
@@ -240,6 +244,12 @@ namespace PizzaTycoon
 
         void Tree(Transform parent, Vector3 pos, System.Random rng)
         {
+            if (Kenney.Available)
+            {
+                string tn = rng.NextDouble() < 0.6 ? "suburban/tree-large" : "suburban/tree-small";
+                Kenney.Spawn(tn, parent, pos, (float)rng.NextDouble() * 360f, 2.2f + (float)rng.NextDouble() * 1.4f, true, "Tree");
+                return;
+            }
             float s = 0.8f + (float)rng.NextDouble() * 0.6f;
             Prim(PrimitiveType.Cylinder, parent, pos + new Vector3(0, 0.6f * s, 0), new Vector3(0.25f, 0.6f * s, 0.25f), Mats.Get(new Color(0.35f, 0.22f, 0.12f), 0.05f));
             var g = Color.Lerp(new Color(0.15f, 0.5f, 0.2f), new Color(0.3f, 0.65f, 0.25f), (float)rng.NextDouble());
@@ -255,6 +265,7 @@ namespace PizzaTycoon
 
         void BuildBlock(Transform parent, Vector3 p, DistrictDef d, System.Random rng)
         {
+            if (Kenney.Available) { BuildBlockKenney(parent, p, d, rng); return; }
             // cluster of 2x2 buildings
             for (int ix = 0; ix < 2; ix++)
                 for (int iz = 0; iz < 2; iz++)
@@ -293,6 +304,7 @@ namespace PizzaTycoon
 
         void BuildRestaurant(Transform parent, Vector3 p, Restaurant r, int slot)
         {
+            if (Kenney.Available) { BuildRestaurantKenney(parent, p, r, slot); return; }
             float sc = 1f + r.size * 0.25f;
             float bw = 5.2f * (0.85f + r.size * 0.1f), bd = 5.2f * (0.85f + r.size * 0.1f);
             float bh = 3.2f + r.size * 0.9f + (r.style >= 3 ? 0.8f : 0f);
@@ -349,6 +361,121 @@ namespace PizzaTycoon
             var lgo = new GameObject("Light");
             lgo.transform.SetParent(holder, false);
             lgo.transform.localPosition = new Vector3(0, 3f, -bd * 0.5f - 2f);
+            var l = lgo.AddComponent<Light>();
+            l.type = LightType.Point; l.range = 12f; l.intensity = 1.4f; l.color = new Color(1f, 0.82f, 0.5f);
+            l.enabled = false;
+            nightLights.Add(l);
+        }
+
+        // ---------------------------------------------------------------- Kenney model versions
+        static readonly string[] lowCommercial = { "building-a", "building-b", "building-c", "building-d", "building-e", "building-f", "building-g", "building-h", "building-i", "building-j", "building-k", "building-l", "building-m", "building-n" };
+        static readonly string[] towers = { "building-skyscraper-a", "building-skyscraper-b", "building-skyscraper-c", "building-skyscraper-d", "building-skyscraper-e" };
+        static readonly string[] restaurantByStyle = { "building-d", "building-a", "building-c", "building-h", "building-n" };
+        const float RoadYaw = 0f;      // yaw of a straight road tile running along X
+        const float BuildingYaw = 0f;  // yaw that turns a building's front towards +Z
+
+        void BuildRoadsKenney(CityDef city, float x0, float x1, float z0, float z1)
+        {
+            float t = Cell / 4f;
+            int cols = city.districtsX, rows = city.districtsY;
+            // vertical roads (along Z) and horizontal roads (along X); crossroads at every intersection
+            for (int i = 0; i <= cols; i++)
+                for (int k = 0; k <= rows * 4; k++)
+                {
+                    float x = x0 + i * Cell, z = z0 + k * t;
+                    bool cross = k % 4 == 0;
+                    Kenney.Spawn(cross ? "roads/road-crossroad" : "roads/road-straight", root, new Vector3(x, 0.02f, z), cross ? 0f : RoadYaw + 90f, t, false, "Road");
+                    if (!cross && k % 2 == 1) StreetLight(new Vector3(x + (i % 2 == 0 ? 2.6f : -2.6f), 0.02f, z), i % 2 == 0 ? 90f : -90f);
+                }
+            for (int j = 0; j <= rows; j++)
+                for (int k = 0; k <= cols * 4; k++)
+                {
+                    if (k % 4 == 0) continue;
+                    float x = x0 + k * t, z = z0 + j * Cell;
+                    Kenney.Spawn("roads/road-straight", root, new Vector3(x, 0.02f, z), RoadYaw, t, false, "Road");
+                    if (k % 2 == 1) StreetLight(new Vector3(x, 0.02f, z + (j % 2 == 0 ? 2.6f : -2.6f)), j % 2 == 0 ? 180f : 0f);
+                }
+        }
+
+        void StreetLight(Vector3 pos, float yaw)
+        {
+            var l = Kenney.Spawn("roads/light-square", root, pos, yaw, 2.4f, true, "Light");
+        }
+
+        void BuildBlockKenney(Transform parent, Vector3 p, DistrictDef d, System.Random rng)
+        {
+            float density = d.population * 0.5f + d.wealth * 0.5f;
+            for (int ix = 0; ix < 2; ix++)
+                for (int iz = 0; iz < 2; iz++)
+                {
+                    var pos = p + new Vector3((ix - 0.5f) * 3.9f, 0.1f, (iz - 0.5f) * 3.9f);
+                    float yaw = BuildingYaw + (iz == 0 ? 180f : 0f);
+                    double roll = rng.NextDouble();
+                    if (d.wealth < 0.35f && roll < 0.5)
+                    {
+                        string house = "suburban/building-type-" + (char)('a' + rng.Next(21));
+                        Kenney.Spawn(house, parent, pos, yaw, 3.5f, false, "House");
+                    }
+                    else if (roll < 0.15 + density * 0.45)
+                    {
+                        string tw = "commercial/" + towers[rng.Next(towers.Length)];
+                        Kenney.Spawn(tw, parent, pos, yaw, 3.2f, false, "Tower");
+                    }
+                    else
+                    {
+                        string bn = "commercial/" + lowCommercial[rng.Next(lowCommercial.Length)];
+                        Kenney.Spawn(bn, parent, pos, yaw, 3.6f, false, "Building");
+                    }
+                }
+        }
+
+        void BuildRestaurantKenney(Transform parent, Vector3 p, Restaurant r, int slot)
+        {
+            float footprint = 5.4f * (0.85f + r.size * 0.12f);
+            float yaw = BuildingYaw + (p.z < 0 ? 180f : 0f);
+            var holder = Kenney.Spawn("commercial/" + restaurantByStyle[Mathf.Clamp(r.style, 0, 4)], parent, p, yaw, footprint, false, "Restaurant_" + r.id);
+            if (holder == null) return;
+            float bw = Kenney.LastSize.x, bh = Kenney.LastSize.y, bd = Kenney.LastSize.z;
+            holder.gameObject.AddComponent<RestaurantTag>().restaurantId = r.id;
+            var col = holder.gameObject.AddComponent<BoxCollider>();
+            col.center = new Vector3(0, bh * 0.5f, 0); col.size = new Vector3(bw, bh, bd);
+            var ownerColor = state.companies[r.owner].color;
+            float front = p.z < 0 ? -1f : 1f;
+
+            // owner-coloured awning over the entrance (in world orientation, not the model's)
+            var awn = Prim(PrimitiveType.Cube, holder.parent, p + new Vector3(0, 2.3f, front * (bd * 0.5f + 0.5f)), new Vector3(bw * 0.9f, 0.12f, 1.2f), Mats.Get(ownerColor, 0.3f));
+            awn.transform.localRotation = Quaternion.Euler(front * -18f, 0, 0);
+
+            // tables, chairs and a parasol in front
+            int tables = 1 + r.size;
+            for (int t = 0; t < tables; t++)
+            {
+                float tx = (t - (tables - 1) * 0.5f) * 2.1f;
+                var tpos = p + new Vector3(tx, 0, front * (bd * 0.5f + 1.7f));
+                Kenney.Spawn("furniture/tableRound", parent, tpos, 0f, 1.05f, false, "Table");
+                Kenney.Spawn("furniture/chair", parent, tpos + new Vector3(-0.7f, 0, 0), 90f, 0.7f, true, "Chair");
+                Kenney.Spawn("furniture/chair", parent, tpos + new Vector3(0.7f, 0, 0), -90f, 0.7f, true, "Chair");
+                if (t % 2 == 0) Kenney.Spawn("commercial/detail-parasol-a", parent, tpos, 0f, 1.6f, false, "Parasol");
+            }
+            Kenney.Spawn("furniture/pottedPlant", parent, p + new Vector3(bw * 0.5f - 0.2f, 0, front * (bd * 0.5f + 0.6f)), 0f, 0.9f, true, "Plant");
+
+            // rotating pizza sign on the roof (the Kenney pizza model)
+            var sign = new GameObject("Sign").transform;
+            sign.SetParent(parent, false);
+            sign.localPosition = p + new Vector3(0, bh + 1.1f, 0);
+            sign.gameObject.AddComponent<Spinner>();
+            sign.gameObject.AddComponent<Bobber>();
+            if (Kenney.Spawn("food/pizza", sign, Vector3.zero, 0f, 2.6f, false, "Pizza") == null)
+                Prim(PrimitiveType.Cylinder, sign, Vector3.zero, new Vector3(2.2f, 0.12f, 2.2f), Mats.Get(new Color(0.95f, 0.75f, 0.35f), 0.3f));
+
+            // owner flag
+            Prim(PrimitiveType.Cylinder, parent, p + new Vector3(bw * 0.4f, bh + 0.9f, bd * 0.4f), new Vector3(0.06f, 0.9f, 0.06f), Mats.Get(Color.gray));
+            Prim(PrimitiveType.Cube, parent, p + new Vector3(bw * 0.4f + 0.5f, bh + 1.5f, bd * 0.4f), new Vector3(1f, 0.6f, 0.05f), Mats.Get(ownerColor, 0.2f));
+
+            // night light
+            var lgo = new GameObject("Light");
+            lgo.transform.SetParent(parent, false);
+            lgo.transform.localPosition = p + new Vector3(0, 3f, front * (bd * 0.5f + 2f));
             var l = lgo.AddComponent<Light>();
             l.type = LightType.Point; l.range = 12f; l.intensity = 1.4f; l.color = new Color(1f, 0.82f, 0.5f);
             l.enabled = false;
