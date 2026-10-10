@@ -52,6 +52,17 @@ namespace PizzaTycoon
             string msg = null;
             for (int t = 0; t < 12 && (victim.closedDays == 0); t++) { bomber.day++; msg = Simulation.Sabotage(bomber, 0, victim, 5); }
             Debug.Log("[selftest] bomb: " + msg + " closedDays=" + victim.closedDays + " rep=" + Mathf.RoundToInt(victim.reputation));
+            // new mechanics: auto recipe, posters, bank, mayor stars, ovens, runners
+            var st = g.State; st.Player.hq = 3; st.Player.cash = 200000;
+            var me = st.RestaurantsOf(0)[0];
+            var auto = Simulation.AutoRecipe(st, me, (int)Group.BigShots);
+            Debug.Log("[selftest] auto recipe: " + auto.name + " ingredients=" + auto.ingredients.Count + " price=" + auto.price);
+            Simulation.TogglePoster(st, 3); Simulation.TogglePoster(st, 3);
+            Debug.Log("[selftest] bank: " + Simulation.RobBank(st) + " dirty=" + st.Player.dirty + " launder: " + Simulation.Launder(st));
+            me.manager = true; me.runners = 2; Simulation.BuyOven(st, me); Simulation.SetMusic(st, me, 1); Simulation.UpgradeLayout(st, me);
+            st.Player.mayor = 2; st.Player.posters.Add(1);
+            for (int d = 0; d < 40; d++) Simulation.Step(st);
+            Debug.Log("[selftest] after 40 days: stars=" + me.stars + " bigShots=" + Mathf.RoundToInt(me.rating[0] * 100) + "% influence=" + me.influence.ToString("0.00") + " oven=" + me.oven + " cash=" + Mathf.RoundToInt(st.Player.cash));
             Debug.Log("[selftest] DONE errors=" + errors);
             Application.Quit();
         }

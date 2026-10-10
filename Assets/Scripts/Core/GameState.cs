@@ -50,10 +50,18 @@ namespace PizzaTycoon
         public float motivation = 60f, health = 85f;
         public int trainDays;       // days of reduced capacity while training on shift
         public bool delivery;
+        public int runners;         // delivery boys: bring supplies, run delivery
+        public int staffAge = 35;   // average age of the staff (groups prefer different ages)
+        public int mgrQuality = 1, mgrService = 1;   // manager's orders 0..2: pizza quality focus, readiness to oblige
         // interior
         public int decor = 1;       // 0 basic, 1 good, 2 luxurious
         public bool plants;
         public float condition = 100f;  // furniture condition 0..100
+        public int oven;            // 0..3 oven level
+        public int music;           // 0 off, 1 classical, 2 pop, 3 rock
+        public int layout;          // 0 cramped, 1 ok, 2 symmetric (needs HQ 2)
+        public float influence = 1f;    // size of the restaurant's circle of influence
+        public int ratsDays;        // rats in the kitchen (from sabotage)
         // status
         public int closedDays;
         public int stars;
@@ -79,6 +87,9 @@ namespace PizzaTycoon
         public int cityAdTarget = -1;
         public int mayor;           // 0..2 mayor bribe level
         public int warehouse;       // 0..2 cooled warehouse
+        public int police;          // 0..2 police donations
+        public float dirty;         // dirty money from the underworld
+        public List<int> posters = new List<int>();   // districts with our posters
     }
 
     [Serializable]
@@ -111,6 +122,7 @@ namespace PizzaTycoon
         public string eventText = "";
         public List<string> trend = new List<string>();
         public int lastPlayerCustomers, lastBestRivalCustomers;
+        public int buffDays, buffKind;      // blue-envelope tasks: 1 decor, 2 staff, 3 menu
 
         public List<DistrictMod> mods = new List<DistrictMod>();
         [NonSerialized] CityDef cityCache;

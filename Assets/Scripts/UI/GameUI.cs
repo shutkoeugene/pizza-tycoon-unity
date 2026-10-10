@@ -53,7 +53,7 @@ namespace PizzaTycoon
                 txtDebt.text = "Долг " + UIKit.Money(S.Player.loan);
                 var mine = S.RestaurantsOf(0);
                 float rep = mine.Count == 0 ? 0 : mine.Average(r => r.reputation);
-                int stars = 0; foreach (var rr in mine) stars += rr.stars;
+                int stars = 0; foreach (var rr in mine) stars = Mathf.Max(stars, rr.stars);
                 txtRep.text = "Реп. " + Mathf.RoundToInt(rep) + "  Звёзды " + stars + "  Штаб " + S.Player.hq;
                 txtEvent.text = S.eventDaysLeft > 0 ? S.eventText : "";
                 txtSpeed.text = G.Speed == 0 ? "ПАУЗА" : new string('>', G.Speed);
@@ -367,7 +367,7 @@ namespace PizzaTycoon
                 UIKit.Row(v, GameData.Styles[r.style].name + ", " + GameData.Sizes[r.size].name + " (" + GameData.Sizes[r.size].seats + " мест)", "реп. " + Mathf.RoundToInt(r.reputation) + "  чист. " + Mathf.RoundToInt(r.cleanliness));
                 UIKit.Row(v, "Вчера: гостей " + r.last.customers + ", отказ " + r.last.unserved + ", пицц " + r.last.pizzas, "Прибыль " + UIKit.Money(r.last.Profit), r.last.Profit >= 0 ? UIKit.Good : UIKit.Bad);
                 UIKit.Row(v, "Всего: выручка " + UIKit.Money(r.total.revenue), "Дней: " + (S.day - r.openedDay));
-                UIKit.Row(v, "Гурманские звёзды: " + r.stars + (r.closedDays > 0 ? "   ЗАКРЫТ ещё " + r.closedDays + " дн." : ""), "оценка богачей " + Mathf.RoundToInt(r.rating[0] * 100) + "%");
+                UIKit.Row(v, "Звёзды: " + r.stars + "   круг влияния " + Mathf.RoundToInt(r.influence * 100) + "%" + (r.closedDays > 0 ? "   ЗАКРЫТ ещё " + r.closedDays + " дн." : ""), "оценка богачей " + Mathf.RoundToInt(r.rating[0] * 100) + "%");
                 var btns = UIKit.HBox(v, 8, 44);
                 UIKit.Btn(btns, "Выбрать", () => { G.SelectedRestaurant = rr.id; G.SelectDistrict(rr.district); Refresh(); }, UIKit.Accent, 18, 130, 40);
                 if (r.size < 2)
@@ -435,6 +435,19 @@ namespace PizzaTycoon
                 bool has = r.menu.Exists(x => x.name == rc.name);
                 var b = UIKit.Btn(grid, rc.name, () => { r.menu.Add(S.DefaultItem(rc.id)); Refresh(); }, null, 18, 250, 44);
                 b.interactable = !has;
+            }
+
+            var ac = UIKit.Label(c, "Автосоздание рецепта для группы (штаб 2+)", 26, UIKit.Accent, TextAnchor.MiddleLeft, FontStyle.Bold); UIKit.Size(ac.gameObject, -1, 40);
+            var arow = UIKit.Rect("Auto", c);
+            var agl = arow.gameObject.AddComponent<GridLayoutGroup>();
+            agl.cellSize = new Vector2(180, 44); agl.spacing = new Vector2(8, 8);
+            agl.constraint = GridLayoutGroup.Constraint.FixedColumnCount; agl.constraintCount = 8;
+            arow.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            for (int gi = 0; gi < 8; gi++)
+            {
+                int gg = gi;
+                var ab = UIKit.Btn(arow, GameData.Groups[gi].name, () => { r.menu.Add(Simulation.AutoRecipe(S, r, gg)); Refresh(); }, Color.Lerp(UIKit.PanelLight, GameData.Groups[gi].color, 0.5f), 16, 180, 44);
+                ab.interactable = S.Player.hq >= 2;
             }
 
             var sup = UIKit.Label(c, "Поставщик (лояльность: до -25% цены через 150 дней)", 26, UIKit.Accent, TextAnchor.MiddleLeft, FontStyle.Bold); UIKit.Size(sup.gameObject, -1, 40);

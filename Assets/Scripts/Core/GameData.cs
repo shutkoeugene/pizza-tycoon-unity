@@ -31,7 +31,7 @@ namespace PizzaTycoon
                 case ObjKind.Restaurants: return "Ресторанов: " + (int)value;
                 case ObjKind.Reputation: return "Средняя репутация: " + (int)value;
                 case ObjKind.Capital: return "Капитал: $" + ((int)value).ToString("N0");
-                case ObjKind.Stars: return "Гурманские звёзды: " + (int)value;
+                case ObjKind.Stars: return "Звёзды в лучшем ресторане: " + (int)value;
                 case ObjKind.Hq: return "Уровень штаба: " + (int)value;
                 default: return "Обойти лучшего конкурента по числу гостей";
             }
@@ -293,15 +293,15 @@ namespace PizzaTycoon
                 ("Цукидзи", .6f, .6f, Taste.Sea), ("Асакуса", .5f, .7f, Taste.Sea), ("Роппонги", .9f, .6f, Taste.Meat), ("Икебукуро", .5f, .9f, Taste.Veg));
 
             Obj("rom", R(3), Rep(40), Cap(30000));
-            Obj("par", R(3), Rep(50), Stars(1), Cap(40000));
+            Obj("par", R(3), Rep(50), Stars(2), Cap(40000));
             Obj("lon", R(4), Rep(55), Cap(55000), Outsell());
             Obj("ber", R(4), Rep(60), Hq(3), Cap(60000));
-            Obj("mad", R(4), Rep(62), Stars(1), Cap(70000));
+            Obj("mad", R(4), Rep(62), Stars(2), Cap(70000));
             Obj("mos", R(5), Rep(65), Hq(3), Cap(85000));
-            Obj("yor", R(5), Rep(66), Stars(1), Outsell(), Cap(110000));
-            Obj("rio", R(5), Rep(68), Stars(1), Hq(4), Cap(120000));
-            Obj("syd", R(6), Rep(70), Stars(2), Cap(140000));
-            Obj("tok", R(6), Rep(72), Stars(2), Hq(4), Cap(180000));
+            Obj("yor", R(5), Rep(66), Stars(3), Outsell(), Cap(110000));
+            Obj("rio", R(5), Rep(68), Stars(3), Hq(4), Cap(120000));
+            Obj("syd", R(6), Rep(70), Stars(4), Cap(140000));
+            Obj("tok", R(6), Rep(72), Stars(4), Hq(4), Cap(180000));
         }
 
         static Objective R(float v) => new Objective(ObjKind.Restaurants, v);

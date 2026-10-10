@@ -51,10 +51,24 @@ namespace PizzaTycoon
             UIKit.Row(c, "Зарплата сотрудника в день (с уровнем оплаты)", UIKit.Money(wage));
             Stepper(c, "Повара (макс. " + size.kitchenSlots + ")", r.cooks.ToString(), () => { r.cooks--; Refresh(); }, () => { r.cooks++; Refresh(); }, r.cooks > 1, r.cooks < size.kitchenSlots);
             Stepper(c, "Обслуживающие", r.waiters.ToString(), () => { r.waiters--; Refresh(); }, () => { r.waiters++; Refresh(); }, r.waiters > 1, r.waiters < size.kitchenSlots + 2);
+            Stepper(c, "Курьеры (возят продукты и доставку; нужно " + ((Mathf.Min(r.cooks, size.kitchenSlots) + 1) / 2) + ")", r.runners.ToString(), () => { r.runners--; Refresh(); }, () => { r.runners++; Refresh(); }, r.runners > 0, r.runners < 6);
             Choice(c, new[] { "2 смены", "3 смены (+35% мощность, ×1.5 расходы, вред здоровью)" }, r.shifts >= 3 ? 1 : 0, i => r.shifts = i == 1 ? 3 : 2);
 
             Heading(c, "Менеджер");
             Choice(c, new[] { "Без менеджера (-15% мощность, хуже оценка)", "Менеджер: $" + (60 + r.skill * 6) + "/день" }, r.manager ? 1 : 0, i => r.manager = i == 1);
+
+            if (r.manager)
+            {
+                var q = UIKit.Label(c, "Приказы менеджеру: качество пиццы (выше качество, но он выбрасывает дешёвые продукты) и готовность угодить (лучше сервис, дороже)", 16, UIKit.Dim); UIKit.Size(q.gameObject, -1, 44);
+                Choice(c, new[] { "Качество: низкое", "Качество: среднее", "Качество: максимум" }, r.mgrQuality, i => r.mgrQuality = i);
+                Choice(c, new[] { "Угождать: слабо", "Угождать: средне", "Угождать: максимум" }, r.mgrService, i => r.mgrService = i);
+            }
+
+            Heading(c, "Возраст персонала: " + r.staffAge + " (богачи любят ~40, студенты и подростки ~24)");
+            var ar = UIKit.HBox(c, 8, 48);
+            ar.GetComponent<HorizontalLayoutGroup>().childForceExpandWidth = true;
+            UIKit.Btn(ar, "Моложе (-5): " + UIKit.Money(Simulation.StaffAgeCost(r)), () => Act(Simulation.RefreshStaffAge(S, r, -5)), null, 16, -1, 48);
+            UIKit.Btn(ar, "Старше (+5): " + UIKit.Money(Simulation.StaffAgeCost(r)), () => Act(Simulation.RefreshStaffAge(S, r, 5)), null, 16, -1, 48);
 
             Heading(c, "Мотивация и здоровье");
             Meter(c, "Мотивация", Mathf.Clamp01(r.motivation / 100f), r.motivation < 20 ? UIKit.Bad : UIKit.Good);
@@ -105,6 +119,19 @@ namespace PizzaTycoon
             Meter(c, "Чистота", r.cleanliness / 100f, r.cleanliness < 50 ? UIKit.Bad : UIKit.Good);
             UIKit.Btn(c, "Реставрация мебели: " + UIKit.Money(Simulation.RestoreCost(r)), () => Act(Simulation.Restore(S, r)), null, 20, -1, 46);
 
+            Heading(c, "Печи, музыка, расстановка");
+            UIKit.Row(c, "Печи: уровень " + r.oven + " (+8% мощности и качества за уровень)", r.oven >= 3 ? "максимум" : UIKit.Money(Simulation.OvenPrice(r)));
+            var ob = UIKit.Btn(c, "Купить печи лучше", () => Act(Simulation.BuyOven(S, r)), UIKit.Good, 20, -1, 46); ob.interactable = r.oven < 3;
+            Choice(c, Simulation.MusicNames, r.music, i => Act(Simulation.SetMusic(S, r, i)));
+            var lb2 = UIKit.Btn(c, r.layout >= 2 ? "Расстановка столов: симметричная (идеал)" : (r.layout == 0 ? "Улучшить тесную расстановку: " : "Симметричная расстановка (штаб 2+): ") + (r.layout >= 2 ? "" : UIKit.Money(Simulation.LayoutPrice(r))), () => Act(Simulation.UpgradeLayout(S, r)), null, 20, -1, 46);
+            lb2.interactable = r.layout < 2;
+            if (r.ratsDays > 0)
+            {
+                var rl = UIKit.Label(c, "В кухне крысы! Ещё " + r.ratsDays + " дн. Инспекция оштрафует и сузит круг влияния.", 18, UIKit.Bad); UIKit.Size(rl.gameObject, -1, 30);
+                UIKit.Btn(c, "Дезинфекция: $400", () => Act(Simulation.Disinfect(S, r)), UIKit.Bad, 20, -1, 46);
+            }
+            UIKit.Row(c, "Круг влияния ресторана", Mathf.RoundToInt(r.influence * 100) + "%  (растёт от призов и конкурсов, падает от штрафов инспекции)");
+
             Heading(c, "Как стиль нравится группам клиентов");
             for (int i = 0; i < 8; i++)
             {
@@ -143,9 +170,21 @@ namespace PizzaTycoon
             Choice(c, groupNames.ToArray(), S.Player.cityAdTarget + 1, i => S.Player.cityAdTarget = i - 1, 14);
             var tip = UIKit.Label(c, "Городская и локальная реклама вместе дорого стоят и дают лишь небольшой прирост. На уровне штаба 4 городская реклама сильнее на 20%.", 16, UIKit.Dim); UIKit.Size(tip.gameObject, -1, 44);
 
-            Heading(c, "Доставка");
-            Choice(c, new[] { "Без доставки", "Доставка по городу: $60/день, использует свободную мощность" }, r.delivery ? 1 : 0, i => r.delivery = i == 1);
-            UIKit.Row(c, "Доставлено вчера", r.deliveryOrders + " заказов");
+            Heading(c, "Плакаты в районах ($60/день каждый; перехватывают прохожих у конкурентов)");
+            var pg = UIKit.Rect("Posters", c);
+            var pgl = pg.gameObject.AddComponent<GridLayoutGroup>();
+            pgl.cellSize = new Vector2(250, 44); pgl.spacing = new Vector2(8, 8);
+            pgl.constraint = GridLayoutGroup.Constraint.FixedColumnCount; pgl.constraintCount = 5;
+            pg.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            for (int di = 0; di < S.City.districts.Count; di++)
+            {
+                int dd = di; bool on = S.Player.posters.Contains(di);
+                UIKit.Btn(pg, (on ? "[x] " : "") + S.City.districts[di].name, () => { Simulation.TogglePoster(S, dd); Refresh(); }, on ? UIKit.Good : UIKit.PanelLight, 16, 250, 44);
+            }
+
+            Heading(c, "Доставка (нужны курьеры)");
+            Choice(c, new[] { "Без доставки", "Доставка по городу: использует свободную мощность, до 45 заказов на курьера" }, r.delivery ? 1 : 0, i => r.delivery = i == 1);
+            UIKit.Row(c, "Курьеров / доставлено вчера", r.runners + " / " + r.deliveryOrders + " заказов");
         }
 
         // ---- headquarters
@@ -163,10 +202,23 @@ namespace PizzaTycoon
             Choice(c, new[] { "Нет", "Благосклонность $90/д (+6% клиентов)", "Покровительство $220/д (+12%, защита от инспекций и налётов)" }, p.mayor, i => p.mayor = i);
             if (p.cash < 0) { var w = UIKit.Label(c, "Баланс отрицательный: взятки и реклама не оплачиваются, мэр не помогает!", 18, UIKit.Bad); UIKit.Size(w.gameObject, -1, 30); }
 
+            int eff = Simulation.MayorLevel(S, 0);
+            var ml = UIKit.Label(c, p.mayor == 0 ? "Мэр не на вашей стороне: звёзд не будет." : eff >= p.mayor ? "Мэр принимает вашу взятку (действует уровень " + eff + ")." : "Конкурент заплатил мэру больше: ваша взятка не действует!", 18, p.mayor > 0 && eff >= p.mayor ? UIKit.Good : UIKit.Bad); UIKit.Size(ml.gameObject, -1, 30);
+            var ml2 = UIKit.Label(c, "Звёзды выдаёт мэр при визите (раз в 15 дней) и только если он на вашей стороне.", 16, UIKit.Dim); UIKit.Size(ml2.gameObject, -1, 26);
+
+            Heading(c, "Полиция (взносы в день)");
+            Choice(c, new[] { "Нет", "Участок $60/д (рэкет x0.6, саботаж против вас слабее)", "Усиленный $150/д (рэкет x0.35)" }, p.police, i => p.police = i);
+
             Heading(c, "Склад (охлаждение уменьшает потери продуктов)");
             UIKit.Row(c, "Уровень склада", p.warehouse + " / 2");
             var wb = UIKit.Btn(c, p.warehouse >= 2 ? "Склад улучшен полностью" : "Улучшить склад: " + UIKit.Money(Simulation.WarehouseCost[Mathf.Min(2, p.warehouse + 1)]), () => Act(Simulation.BuyWarehouse(S)), null, 20, -1, 46);
             wb.interactable = p.warehouse < 2;
+
+            Heading(c, "Подполье (штаб 3+): грязных денег $" + Mathf.RoundToInt(p.dirty).ToString("N0"));
+            var ur = UIKit.HBox(c, 8, 50);
+            ur.GetComponent<HorizontalLayoutGroup>().childForceExpandWidth = true;
+            var rb = UIKit.Btn(ur, "Ограбить банк (экипаж $3 000, шанс 55%, до $50 000)", () => { var res = Simulation.RobBank(S); Act(res, res); }, UIKit.Bad, 17, -1, 50); rb.interactable = p.hq >= 3;
+            var lw = UIKit.Btn(ur, "Отмыть деньги (курс 60%)", () => { var res = Simulation.Launder(S); Act(res, res); }, UIKit.PanelLight, 17, -1, 50); lw.interactable = p.dirty >= 1f;
 
             Heading(c, "Саботаж конкурентов");
             var warn = UIKit.Label(c, "Риск разоблачения: штраф $3 000 и потеря репутации. Охрана жертвы снижает шанс успеха.", 17, UIKit.Dim); UIKit.Size(warn.gameObject, -1, 28);
@@ -214,7 +266,7 @@ namespace PizzaTycoon
                 var desc = UIKit.Label(v, gd.desc + "  |  любимые стили: " + string.Join(", ", gd.liked.Select(x => GameData.Styles[x].name)), 15, UIKit.Dim); UIKit.Size(desc.gameObject, -1, 22);
                 UIKit.Size(card.gameObject, -1, 76);
             }
-            var bsl = UIKit.Label(c, "Гурманские звёзды даёт мэр по мнению богачей: нужна оценка ≥78% (15 дней) для 1-й и ≥86% (25 дней) для 2-й звезды. Прогресс: " + r.starProgress + " дн., звёзд: " + r.stars, 18, UIKit.Accent);
+            var bsl = UIKit.Label(c, "Звёзды: мэр при визите (раз в 15 дней, нужна взятка) даёт по звезде за каждые 3 пункта оценки богачей выше " + Simulation.StarMinimum + "%. Оценка богачей сейчас " + Mathf.RoundToInt(r.rating[0] * 100) + "% => звёзд " + Simulation.StarsFor(r) + " (сейчас " + r.stars + ").", 18, UIKit.Accent);
             UIKit.Size(bsl.gameObject, -1, 52);
         }
     }

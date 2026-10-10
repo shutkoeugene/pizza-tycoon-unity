@@ -18,6 +18,34 @@ namespace PizzaTycoon
         public static readonly float[] SabotageCost = { 800, 500, 1500, 3500, 9000, 5000 };
         public static readonly int[] SabotageHq = { 3, 1, 3, 3, 4, 3 };
 
+        public static readonly int[] AgePref = { 40, 32, 24, 28, 24, 38, 34, 28 };
+        public static readonly float[] OvenCost = { 0, 1500, 4000, 9000 };
+        public static readonly string[] MusicNames = { "Без музыки", "Классика", "Поп", "Рок" };
+        public static readonly float[] PoliceCost = { 0, 60, 150 };
+        static readonly float[] PoliceRacket = { 1f, 0.6f, 0.35f };
+        static readonly float[] PoliceDefence = { 1f, 0.85f, 0.7f };
+        const float PosterCost = 60f;
+
+        public static float MusicFit(int gi, int music)
+        {
+            if (music == 0) return 0f;
+            bool liked;
+            switch ((Group)gi)
+            {
+                case Group.BigShots: liked = music == 1; break;
+                case Group.Yuppies: liked = music == 1 || music == 2; break;
+                case Group.Students: liked = music == 2 || music == 3; break;
+                case Group.Kids: liked = music == 2; break;
+                case Group.Teens: liked = music == 3 || music == 2; break;
+                case Group.BlueCollar: liked = music == 2; break;
+                case Group.Tourists: liked = music == 2 || music == 1; break;
+                default: liked = music == 3; break;
+            }
+            if (liked) return 0.04f;
+            bool hatesRock = music == 3 && (gi == (int)Group.BigShots || gi == (int)Group.Yuppies || gi == (int)Group.Kids || gi == (int)Group.Tourists);
+            return hatesRock ? -0.04f : 0f;
+        }
+
         public static float MarketingPrice(int level) => AdCost[level];
         public static int GuardsNeeded(Restaurant r) => r.size + 1;
 
@@ -88,7 +116,8 @@ namespace PizzaTycoon
             }
             if (n == 0) return 0;
             float variety = Mathf.Min(1.2f, 0.8f + n * 0.08f);
-            return Mathf.Clamp01(sum / n * variety);
+            float bonus = (r.manager ? 0.03f * r.mgrQuality : 0f) + 0.01f * r.oven;
+            return Mathf.Clamp01(sum / n * variety + bonus);
         }
 
         public static float DecorScore(Restaurant r, int gi)
@@ -99,7 +128,8 @@ namespace PizzaTycoon
             float mul = r.decor == 0 ? 0.9f : r.decor == 1 ? 1f : 1.1f;
             float cond = 0.6f + 0.4f * r.condition / 100f;
             float clean = 0.6f + 0.4f * r.cleanliness / 100f;
-            return Mathf.Clamp01(fit * mul * cond * clean + (r.plants ? 0.05f : 0f));
+            float layoutAdj = (r.layout - 1) * 0.03f;
+            return Mathf.Clamp01(fit * mul * cond * clean + (r.plants ? 0.05f : 0f) + MusicFit(gi, r.music) + layoutAdj);
         }
 
         public static float StaffScore(GameState g, Restaurant r, int gi)
@@ -107,7 +137,8 @@ namespace PizzaTycoon
             var grp = GameData.Groups[gi];
             float skill = 0.45f + r.skill * 0.1f;
             float hm = 0.55f + 0.45f * (r.health + r.motivation) / 200f;
-            float adj = r.manager ? 0.08f : -0.12f;
+            float adj = r.manager ? 0.08f + 0.03f * r.mgrService : -0.12f;
+            adj -= 0.0035f * Mathf.Abs(r.staffAge - AgePref[gi]);
             int need = GuardsNeeded(r);
             if (g.companies[r.owner].hq >= 2)
             {
@@ -119,7 +150,13 @@ namespace PizzaTycoon
         }
 
         public static float Rating(GameState g, Restaurant r, int gi)
-            => (MenuScore(g, r, gi) + DecorScore(r, gi) + StaffScore(g, r, gi)) / 3f;
+        {
+            float b = r.owner == 0 && g.buffDays > 0 ? 0.05f : 0f;
+            float menu = MenuScore(g, r, gi) + (g.buffKind == 3 ? b : 0f);
+            float decor = DecorScore(r, gi) + (g.buffKind == 1 ? b : 0f);
+            float staff = StaffScore(g, r, gi) + (g.buffKind == 2 ? b : 0f);
+            return (Mathf.Clamp01(menu) + Mathf.Clamp01(decor) + Mathf.Clamp01(staff)) / 3f;
+        }
 
         public static float WeightedRating(GameState g, Restaurant r)
         {
@@ -158,9 +195,9 @@ namespace PizzaTycoon
         {
             var c = g.companies[r.owner];
             float rep = 0.4f + r.reputation / 100f * 1.2f;
-            float star = 1f + 0.12f * r.stars;
-            float mayor = c.cash >= 0 ? MayorBoost[c.mayor] : 1f;
-            return r.rating[gi] * rep * AdFactor(g, r, gi) * star * mayor;
+            float star = 1f + 0.06f * r.stars;
+            float mayor = c.cash >= 0 ? MayorBoost[MayorLevel(g, r.owner)] : 1f;
+            return r.rating[gi] * rep * AdFactor(g, r, gi) * star * mayor * Mathf.Sqrt(Mathf.Max(0.3f, r.influence));
         }
 
         public static float Attraction(GameState g, Restaurant r)   // average, for UI/AI
@@ -168,6 +205,14 @@ namespace PizzaTycoon
             var mix = g.City.districts[r.district].mix; float a = 0;
             for (int i = 0; i < 8; i++) a += mix[i] * Attraction(g, r, i);
             return a;
+        }
+
+        // the mayor favours the highest bribe: a smaller bribe than a rival's is wasted
+        public static int MayorLevel(GameState g, int owner)
+        {
+            int mine = g.companies[owner].mayor, top = 0;
+            for (int i = 0; i < g.companies.Count; i++) if (i != owner && g.companies[i].cash >= 0) top = Mathf.Max(top, g.companies[i].mayor);
+            return mine >= top ? mine : 0;
         }
 
         static float CityAdSpill(Company c) => 1f + CityAdBoost[c.cityAd] * 0.5f;
@@ -223,8 +268,16 @@ namespace PizzaTycoon
                         if (j == r.district) continue;
                         var cd = city.districts[j];
                         if (Mathf.Abs(cd.cell.x - d.cell.x) + Mathf.Abs(cd.cell.y - d.cell.y) != 1) continue;
-                        float dm = (100f + 520f * cd.population) * city.baseDemand * g.demandMul * weekday * 0.2f * cd.mix[gi];
+                        float dm = (100f + 520f * cd.population) * city.baseDemand * g.demandMul * weekday * 0.2f * r.influence * cd.mix[gi];
                         taken[gi] += dm * attr[r.id][gi] / (distAttr[j, gi] + attr[r.id][gi] + K);
+                    }
+                    // posters in other districts pull passers-by
+                    foreach (int j in g.companies[r.owner].posters)
+                    {
+                        if (j == r.district || j < 0 || j >= city.districts.Count) continue;
+                        var pd = city.districts[j];
+                        float pm = (100f + 520f * pd.population) * city.baseDemand * g.demandMul * weekday * 0.25f * pd.mix[gi];
+                        taken[gi] += pm * attr[r.id][gi] / (distAttr[j, gi] + attr[r.id][gi] + K);
                     }
                 }
                 RunDay(g, r, taken, rng);
@@ -243,13 +296,14 @@ namespace PizzaTycoon
                 if (nrest > 0)
                 {
                     c.cash -= GameState.HqUpkeep(c.hq);
-                    c.cash -= CityAdCost[c.cityAd] + MayorCost[c.mayor];
+                    c.cash -= CityAdCost[c.cityAd] + MayorCost[c.mayor] + PoliceCost[c.police] + PosterCost * c.posters.Count;
                 }
             }
             foreach (var r in g.restaurants) g.companies[r.owner].cash += r.last.Profit;
 
             Incidents(g, rng);
             StaffAndStars(g, rng);
+            Events(g, rng);
             RunCompetitors(g, rng);
 
             g.cashHistory.Add(g.Player.cash);
@@ -257,6 +311,8 @@ namespace PizzaTycoon
             g.day++;
 
             if (g.Player.cash < -8000 && g.Player.loan >= 49000) { g.bankrupt = true; g.AddNews("Вы обанкротились."); }
+            bool monopoly = g.day >= 30 && g.restaurants.FindAll(x => x.owner != 0).Count == 0 && g.RestaurantsOf(0).Count > 0;
+            if (!g.won && monopoly) { g.won = true; g.AddNews("Все конкуренты разорены: пиццерийная монополия! Город ваш."); }
             if (!g.won && g.day >= 90 && AllObjectivesDone(g))
             {
                 g.won = true;
@@ -298,6 +354,8 @@ namespace PizzaTycoon
             float cap = Mathf.Min(cooks * 95f * skill, r.waiters * 85f * skill, size.seats * 7f);
             cap *= r.shifts >= 3 ? 1.35f : 1f;
             cap *= r.manager ? 1f : 0.85f;
+            cap *= 1f + 0.08f * r.oven;
+            if (r.runners * 2 < cooks) cap *= 0.85f;      // not enough runners to bring supplies
             cap *= 0.7f + 0.3f * Mathf.Clamp(r.motivation, 0f, 100f) / 100f;
             if (r.trainDays > 0) { cap *= 0.5f; r.trainDays--; }
 
@@ -309,11 +367,11 @@ namespace PizzaTycoon
             s.customers = Mathf.RoundToInt(served);
             s.unserved = Mathf.RoundToInt(Mathf.Max(0, wanted - served));
 
-            if (r.delivery && enabled > 0)
+            if (r.delivery && enabled > 0 && r.runners > 0)
             {
                 float spare = Mathf.Max(0, cap - served);
                 float avgA = 0; for (int i = 0; i < 8; i++) avgA += r.rating[i] / 8f;
-                r.deliveryOrders = Mathf.RoundToInt(Mathf.Min(spare * 0.8f, (25f + 60f * avgA) * CityAdSpill(company)));
+                r.deliveryOrders = Mathf.RoundToInt(Mathf.Min(Mathf.Min(spare * 0.8f, (25f + 60f * avgA) * CityAdSpill(company)), r.runners * 45f));
             }
 
             float tot = 0; var w = new List<float>();
@@ -331,6 +389,7 @@ namespace PizzaTycoon
             }
             float loyalty = GameState.Loyalty(r);
             float waste = (r.manager ? 0.03f : 0.09f) * (1f - 0.4f * company.warehouse) * (r.supplier == 0 ? 1.5f : 1f);
+            if (r.manager) waste *= 1f + 0.4f * r.mgrQuality * (r.supplier == 0 ? 1.5f : r.supplier == 1 ? 0.6f : 0.2f);   // a picky manager throws away cheap stock
             int orders = s.customers + r.deliveryOrders;
             for (int i = 0; i < r.menu.Count; i++)
             {
@@ -342,9 +401,10 @@ namespace PizzaTycoon
             }
             float shiftMul = r.shifts >= 3 ? 1.5f : 1f;
             s.costWages = (r.cooks + r.waiters) * g.StaffWage(r.skill, r.wage) * shiftMul
-                          + (r.manager ? 60f + r.skill * 6f : 0f)
+                          + (r.manager ? 60f + r.skill * 6f + 10f * r.mgrService : 0f)
                           + r.guards * GameState.GuardWage(r.guardSkill)
-                          + (r.delivery ? 60f : 0f);
+                          + r.runners * g.StaffWage(r.skill, r.wage) * 0.8f * shiftMul
+                          + (r.music > 0 ? 10f : 0f);
             s.costRent = g.DailyRent(r);
             s.costMarketing = AdCost[r.marketing];
             int chain = g.restaurants.FindAll(x => x.owner == r.owner).Count;
@@ -375,25 +435,36 @@ namespace PizzaTycoon
             r.total.costRent += s.costRent; r.total.costMarketing += s.costMarketing; r.total.costOther += s.costOther;
         }
 
+        public static bool FailsInspection(Restaurant r)
+        {
+            float q = 0; int n = 0;
+            foreach (var m in r.menu) if (m.enabled) { q += GameState.ItemQuality(m, r.supplier); n++; }
+            float avgQ = n > 0 ? q / n : 1f;
+            float cleanBelow = ExoticCount(r) > 0 ? 80f : 60f;     // exotic menus attract inspectors
+            return r.cleanliness < cleanBelow || avgQ < 0.35f || r.health < 30f || r.ratsDays > 0;
+        }
+
         static void Incidents(GameState g, System.Random rng)
         {
             foreach (var r in g.restaurants.ToArray())
             {
                 bool mine = r.owner == 0;
-                if (g.day > 25 && rng.NextDouble() < 0.012f * Mathf.Pow(0.65f, r.guards))
+                var co = g.companies[r.owner];
+                // racketeers: guards and police donations reduce the chance
+                if (g.day > 25 && rng.NextDouble() < 0.012f * Mathf.Pow(0.65f, r.guards) * PoliceRacket[co.police])
                 {
                     float cost = 200 + (float)rng.NextDouble() * 600;
-                    g.companies[r.owner].cash -= cost; r.reputation = Mathf.Max(0, r.reputation - 3);
-                    if (mine) g.AddNews("Рэкетиры разгромили зал в «" + r.name + "»: убыток " + UIKit.Money(cost) + ". Наймите охрану.");
+                    co.cash -= cost; r.reputation = Mathf.Max(0, r.reputation - 3);
+                    if (mine) g.AddNews("Рэкетиры разгромили зал в «" + r.name + "»: убыток " + UIKit.Money(cost) + ". Наймите охрану или платите полиции.");
                 }
-                int exo = ExoticCount(r);
-                float inspectP = 0.012f * (1 + exo);
-                float inspectBelow = exo > 0 ? 80f : 60f;   // exotic menus attract inspectors
-                if (rng.NextDouble() < inspectP && r.cleanliness < inspectBelow && g.companies[r.owner].mayor < 2)
+                // inspector: checks cleanliness, quality of food, staff health and rats
+                float inspectP = 0.012f * (1 + ExoticCount(r));
+                if (rng.NextDouble() < inspectP && FailsInspection(r) && MayorLevel(g, r.owner) < 2)
                 {
                     float fine = 600 + (float)rng.NextDouble() * 400;
-                    g.companies[r.owner].cash -= fine; r.reputation = Mathf.Max(0, r.reputation - 4);
-                    if (mine) g.AddNews("Санинспекция оштрафовала «" + r.name + "» на " + UIKit.Money(fine) + ": грязно!");
+                    co.cash -= fine; r.reputation = Mathf.Max(0, r.reputation - 4);
+                    r.influence = Mathf.Max(0.5f, r.influence - 0.12f);
+                    if (mine) g.AddNews("Инспекция оштрафовала «" + r.name + "» на " + UIKit.Money(fine) + ": круг влияния сузился.");
                 }
             }
         }
@@ -406,27 +477,80 @@ namespace PizzaTycoon
                 r.motivation = Mathf.Clamp(r.motivation + (target - r.motivation) * 0.1f, -20f, 100f);
                 r.health = Mathf.Clamp(r.health + (r.shifts >= 3 ? -0.4f : 0.12f), 10f, 100f);
                 r.supplierDays++;
+                if (r.ratsDays > 0) { r.ratsDays--; r.cleanliness = Mathf.Max(20, r.cleanliness - 1f); }
+                if (r.influence < 1f) r.influence = Mathf.Min(1f, r.influence + 0.002f);
+                else if (r.influence > 1f) r.influence = Mathf.Max(1f, r.influence - 0.0008f);
                 if (r.closedDays > 0) continue;
 
-                float bs = r.rating[(int)Group.BigShots];
-                bool ok = r.stars == 0 ? bs >= 0.78f : bs >= 0.86f;
-                if (r.stars < 2)
+                // the mayor visits and awards one gourmet star per 3 points of the Big Shots' rating above the minimum
+                if ((g.day + r.id) % 15 == 0 && g.companies[r.owner].cash >= 0 && MayorLevel(g, r.owner) >= 1)
                 {
-                    if (ok) r.starProgress++; else r.starProgress = Mathf.Max(0, r.starProgress - 1);
-                    int need = r.stars == 0 ? 15 : 25;
-                    if (r.starProgress >= need)
+                    int now = StarsFor(r);
+                    if (now != r.stars)
                     {
-                        r.stars++; r.starProgress = 0;
-                        if (r.owner == 0) g.AddNews("Мэр присвоил ресторану «" + r.name + "» гурманскую звезду! (" + r.stars + ")");
+                        if (r.owner == 0) g.AddNews(now > r.stars ? "Мэр заглянул в «" + r.name + "»: гурманские звёзды " + now + "!" : "Мэр заглянул в «" + r.name + "» и снизил звёзды до " + now + ".");
+                        r.stars = now;
                     }
                 }
-                if (r.stars > 0 && bs < 0.70f)
-                {
-                    r.starLoss++;
-                    if (r.starLoss >= 10) { r.stars--; r.starLoss = 0; if (r.owner == 0) g.AddNews("Мэр отобрал звезду у «" + r.name + "»: богачам больше не нравится."); }
-                }
-                else r.starLoss = 0;
             }
+        }
+
+        public static float StarMinimum = 75f;
+        public static int StarsFor(Restaurant r)
+        {
+            float a = r.rating[(int)Group.BigShots] * 100f;
+            return Mathf.Clamp(Mathf.FloorToInt((a - StarMinimum) / 3f), 0, 5);
+        }
+
+        // quarterly prizes, cooking contests and blue-envelope tasks
+        static void Events(GameState g, System.Random rng)
+        {
+            if (g.buffDays > 0) { g.buffDays--; if (g.buffDays == 0) g.buffKind = 0; }
+            if (g.day > 10 && g.day % 25 == 0 && g.buffDays == 0 && g.RestaurantsOf(0).Count > 0)
+            {
+                string[] names = { "", "Поручение мэра: освежить интерьер — оценка интерьера +5% на 20 дней.", "Поручение: показать класс обслуживания — оценка персонала +5% на 20 дней.", "Поручение: дегустация для гостей — оценка меню +5% на 20 дней." };
+                g.buffKind = 1 + rng.Next(3); g.buffDays = 20; g.AddNews(names[g.buffKind]);
+            }
+            if (g.day > 0 && g.day % 90 == 0 && g.restaurants.Count > 0)
+            {
+                Restaurant bestR = null, bestI = null; float br = -1, bi = -1;
+                foreach (var r in g.restaurants)
+                {
+                    float rr = r.rating[(int)Group.BigShots]; if (rr > br) { br = rr; bestR = r; }
+                    float di = 0; for (int i = 0; i < 8; i++) di += DecorScore(r, i) / 8f; if (di > bi) { bi = di; bestI = r; }
+                }
+                Award(g, bestR, "Лучший ресторан квартала");
+                if (bestI != bestR) Award(g, bestI, "Лучший интерьер квартала");
+            }
+            if (g.day > 0 && g.day % 45 == 0 && g.restaurants.Count > 1)
+            {
+                int winner = -1; float best = -1;
+                for (int ci = 0; ci < g.companies.Count; ci++)
+                {
+                    float sc = 0;
+                    foreach (var r in g.RestaurantsOf(ci))
+                    {
+                        float q = 0; int n = 0;
+                        foreach (var m in r.menu) if (m.enabled) { q += GameState.ItemQuality(m, r.supplier); n++; }
+                        if (n > 0) sc = Mathf.Max(sc, q / n + 0.03f * r.oven + (r.manager ? 0.03f * r.mgrQuality : 0f));
+                    }
+                    if (sc > best) { best = sc; winner = ci; }
+                }
+                if (winner >= 0)
+                {
+                    foreach (var r in g.RestaurantsOf(winner)) { r.influence = Mathf.Min(1.6f, r.influence + 0.06f); r.reputation = Mathf.Min(100f, r.reputation + 3f); }
+                    g.companies[winner].cash += 1500;
+                    g.AddNews("Конкурс пицц: победил " + g.companies[winner].name + " (приз $1 500).");
+                }
+            }
+        }
+
+        static void Award(GameState g, Restaurant r, string title)
+        {
+            if (r == null) return;
+            r.influence = Mathf.Min(1.6f, r.influence + 0.15f);
+            r.reputation = Mathf.Min(100f, r.reputation + 5f);
+            g.AddNews(title + ": «" + r.name + "» (" + g.companies[r.owner].name + "). Круг влияния вырос.");
         }
 
         // ------------------------------------------------------------ competitors
@@ -441,6 +565,13 @@ namespace PizzaTycoon
             {
                 var c = g.companies[ci];
                 var mine = g.RestaurantsOf(ci);
+                if (mine.Count == 0) continue;
+                if (c.cash < -15000 && mine.Count == 1)
+                {
+                    g.restaurants.Remove(mine[0]);
+                    g.AddNews(c.name + " разорился и покинул рынок.");
+                    continue;
+                }
                 if (c.cash < 0 && mine.Count > 1 && rng.NextDouble() < 0.1)
                 {
                     var worst = mine[0];
@@ -484,6 +615,10 @@ namespace PizzaTycoon
                         if (!r.menu.Exists(m => m.name == rec.name)) r.menu.Add(g.DefaultItem(rec.id));
                     }
                 }
+                if (c.aggression > 1f && c.cash > 25000 && c.mayor < 1) c.mayor = 1;
+                if (c.aggression > 1.1f && c.cash > 70000 && c.hq >= 3 && c.mayor < 2) c.mayor = 2;
+                if (c.cash > 30000 && c.police < 1 && rng.NextDouble() < 0.2f) c.police = 1;
+                foreach (var rr in mine) { if (rr.runners < (rr.cooks + 1) / 2) rr.runners = (rr.cooks + 1) / 2; if (c.cash > 20000) rr.oven = Mathf.Max(rr.oven, 1); }
                 if (c.hq < 4 && c.cash > GameState.HqCost[c.hq + 1] * 1.8f && rng.NextDouble() < 0.3f) { c.cash -= GameState.HqCost[c.hq + 1]; c.hq++; }
                 if (mine.Count > 2 && c.cash > 30000 && c.cityAd == 0 && rng.NextDouble() < 0.2f) c.cityAd = 1;
 
@@ -641,7 +776,7 @@ namespace PizzaTycoon
             if (a.cash < SabotageCost[kind]) return "Недостаточно денег (" + UIKit.Money(SabotageCost[kind]) + ").";
             a.cash -= SabotageCost[kind];
             var rng = new System.Random(g.seed + g.day * 31 + target.id * 17 + kind);
-            float success = 0.85f * Mathf.Pow(0.75f, target.guards);
+            float success = 0.85f * Mathf.Pow(0.75f, target.guards) * PoliceDefence[g.companies[target.owner].police];
             float detect = 0.2f + 0.05f * target.guards;
             string victimMsg = null, result;
             bool ok = rng.NextDouble() < success;
@@ -651,13 +786,13 @@ namespace PizzaTycoon
             {
                 switch (kind)
                 {
-                    case 0: target.cleanliness = Mathf.Max(20, target.cleanliness - 35); target.reputation = Mathf.Max(0, target.reputation - 4); victimMsg = "В «" + target.name + "» обнаружены крысы!"; result = "Крысы подброшены."; break;
+                    case 0: target.cleanliness = Mathf.Max(20, target.cleanliness - 35); target.reputation = Mathf.Max(0, target.reputation - 4); target.ratsDays = Mathf.Max(target.ratsDays, 10); victimMsg = "В «" + target.name + "» обнаружены крысы!"; result = "Крысы подброшены."; break;
                     case 1:
-                        if (target.cleanliness < 75 && g.companies[target.owner].mayor < 2) { g.companies[target.owner].cash -= 1500; target.closedDays = Mathf.Max(target.closedDays, 2); target.reputation = Mathf.Max(0, target.reputation - 5); victimMsg = "Санинспекция закрыла «" + target.name + "» на 2 дня."; result = "Санинспекция закрыла ресторан."; }
+                        if (FailsInspectionForSabotage(target) && MayorLevel(g, target.owner) < 2) { g.companies[target.owner].cash -= 1500; target.closedDays = Mathf.Max(target.closedDays, 2); target.reputation = Mathf.Max(0, target.reputation - 5); victimMsg = "Санинспекция закрыла «" + target.name + "» на 2 дня."; result = "Санинспекция закрыла ресторан."; }
                         else result = "Санинспекция ничего не нашла.";
                         break;
                     case 2:
-                        if (g.companies[target.owner].mayor >= 2) result = "Мэр покрыл жертву: налёт отменён.";
+                        if (MayorLevel(g, target.owner) >= 2) result = "Мэр покрыл жертву: налёт отменён.";
                         else { target.closedDays = Mathf.Max(target.closedDays, 3); target.reputation = Mathf.Max(0, target.reputation - 8); victimMsg = "Полиция устроила налёт на «" + target.name + "»."; result = "Налёт полиции удался."; }
                         break;
                     case 3: target.motivation = Mathf.Max(-20, target.motivation - 35); target.health = Mathf.Max(10, target.health - 25); target.cleanliness = Mathf.Max(20, target.cleanliness - 20); target.reputation = Mathf.Max(0, target.reputation - 8); target.closedDays = Mathf.Max(target.closedDays, 1); victimMsg = "Головорезы напали на персонал «" + target.name + "»."; result = "Головорезы поработали."; break;
@@ -680,6 +815,105 @@ namespace PizzaTycoon
             return result;
         }
 
+        static bool FailsInspectionForSabotage(Restaurant r) => r.cleanliness < 75f || FailsInspection(r);
+
+        // ------------------------------------------------------------ extra actions
+        public static string BuyOven(GameState g, Restaurant r)
+        {
+            if (r.oven >= 3) return "Печи уже лучшие.";
+            float cost = OvenCost[r.oven + 1] * (r.size + 1);
+            if (g.Player.cash < cost) return "Недостаточно денег (" + UIKit.Money(cost) + ").";
+            g.Player.cash -= cost; r.oven++; return null;
+        }
+        public static float OvenPrice(Restaurant r) => r.oven >= 3 ? 0 : OvenCost[r.oven + 1] * (r.size + 1);
+
+        public static string SetMusic(GameState g, Restaurant r, int music)
+        {
+            if (r.music == music) return null;
+            if (music > 0 && g.Player.cash < 300) return "Недостаточно денег (установка $300).";
+            if (music > 0 && r.music == 0) g.Player.cash -= 300;
+            r.music = music; return null;
+        }
+
+        public static string UpgradeLayout(GameState g, Restaurant r)
+        {
+            if (r.layout >= 2) return "Расстановка уже идеальная.";
+            if (r.layout == 1 && g.Player.hq < 2) return "Автодизайн расстановки открывается со штаба 2.";
+            float cost = 1200f * (r.size + 1);
+            if (g.Player.cash < cost) return "Недостаточно денег (" + UIKit.Money(cost) + ").";
+            g.Player.cash -= cost; r.layout++; return null;
+        }
+        public static float LayoutPrice(Restaurant r) => 1200f * (r.size + 1);
+
+        public static string Disinfect(GameState g, Restaurant r)
+        {
+            if (r.ratsDays <= 0) return "Крыс нет.";
+            if (g.Player.cash < 400) return "Недостаточно денег ($400).";
+            g.Player.cash -= 400; r.ratsDays = 0; return null;
+        }
+
+        public static string RefreshStaffAge(GameState g, Restaurant r, int delta)
+        {
+            float cost = 300f * (r.cooks + r.waiters);
+            int age = Mathf.Clamp(r.staffAge + delta, 20, 60);
+            if (age == r.staffAge) return "Предел возраста.";
+            if (g.Player.cash < cost) return "Недостаточно денег (" + UIKit.Money(cost) + ").";
+            g.Player.cash -= cost; r.staffAge = age; return null;
+        }
+        public static float StaffAgeCost(Restaurant r) => 300f * (r.cooks + r.waiters);
+
+        public static void TogglePoster(GameState g, int district)
+        {
+            var c = g.Player;
+            if (c.posters.Contains(district)) c.posters.Remove(district); else c.posters.Add(district);
+        }
+
+        // underworld: robbery and laundering (HQ 3+)
+        public static string RobBank(GameState g)
+        {
+            var c = g.Player;
+            if (c.hq < 3) return "Нужен штаб уровня 3.";
+            if (c.cash < 3000) return "Нужны $3 000 на экипаж.";
+            c.cash -= 3000;
+            var rng = new System.Random(g.seed + g.day * 13 + 7);
+            if (rng.NextDouble() < 0.55)
+            {
+                c.dirty += 50000f; g.AddNews("Банк ограблен: добыто $50 000 грязных денег.");
+                return "Успех! +$50 000 грязных денег.";
+            }
+            c.cash -= 8000; foreach (var r in g.RestaurantsOf(0)) r.reputation = Mathf.Max(0, r.reputation - 10);
+            g.AddNews("Налёт на банк провалился: штраф $8 000, репутация упала.");
+            return "Провал! Штраф $8 000, репутация упала.";
+        }
+
+        public static string Launder(GameState g)
+        {
+            var c = g.Player;
+            if (c.dirty < 1f) return "Грязных денег нет.";
+            float clean = c.dirty * 0.6f; c.dirty = 0; c.cash += clean;
+            return "Отмыто: +" + UIKit.Money(clean) + " (курс 60%).";
+        }
+
+        // auto recipe creator (HQ 2+): best five toppings for a customer group
+        public static MenuItem AutoRecipe(GameState g, Restaurant r, int gi)
+        {
+            var grp = GameData.Groups[gi];
+            var scored = new List<KeyValuePair<float, IngredientDef>>();
+            foreach (var ing in GameData.Ingredients)
+            {
+                if (ing.id == "dough") continue;
+                float sc = (ing.taste == grp.taste ? 1f : 0.2f) + ing.quality * 0.8f + (g.trend.Contains(ing.id) ? 0.3f : 0f) - g.IngredientCost(ing.id, r.supplier) * 0.15f;
+                if (ing.exotic) sc += ExoticReaction(gi) * 8f;
+                scored.Add(new KeyValuePair<float, IngredientDef>(sc, ing));
+            }
+            scored.Sort((a, b) => b.Key.CompareTo(a.Key));
+            var m = new MenuItem { name = "Для: " + grp.name };
+            m.ingredients.Add("dough");
+            foreach (var kv in scored) { if (m.ingredients.Count >= 6) break; m.ingredients.Add(kv.Value.id); }
+            m.price = Mathf.Round(FairPrice(g, m, r) * grp.priceLevel * 0.97f * 10f) / 10f;
+            return m;
+        }
+
         // ------------------------------------------------------------ objectives
         public static bool IsDone(GameState g, Objective o)
         {
@@ -689,7 +923,7 @@ namespace PizzaTycoon
                 case ObjKind.Restaurants: return mine.Count >= o.value;
                 case ObjKind.Reputation: { float rep = 0; foreach (var r in mine) rep += r.reputation; return mine.Count > 0 && rep / mine.Count >= o.value; }
                 case ObjKind.Capital: return g.Player.cash - g.Player.loan >= o.value;
-                case ObjKind.Stars: { int st = 0; foreach (var r in mine) st += r.stars; return st >= o.value; }
+                case ObjKind.Stars: { int st = 0; foreach (var r in mine) st = Mathf.Max(st, r.stars); return st >= o.value; }
                 case ObjKind.Hq: return g.Player.hq >= o.value;
                 default: return g.lastPlayerCustomers > 0 && g.lastPlayerCustomers >= g.lastBestRivalCustomers;
             }

@@ -59,6 +59,16 @@ namespace PizzaTycoon
             }
             foreach (var m in r.menu) m.price = Mathf.Round(Simulation.FairPrice(s, m, r) * grp.priceLevel * 0.97f * 10f) / 10f;
             if (c.cash > 3000) r.manager = true;
+            if (r.manager && c.cash > 10000 && r.supplier != 0) { r.mgrQuality = 2; r.mgrService = 2; }
+            r.runners = Mathf.Max(r.runners, (r.cooks + 1) / 2);
+            // ovens, music, layout, staff age
+            if (c.cash > 12000 && r.oven < 3 && c.cash > Simulation.OvenPrice(r) * 2.5f) Simulation.BuyOven(s, r);
+            int[] bestMusic = { 1, 1, 2, 2, 3, 2, 2, 3 };
+            if (c.cash > 5000) Simulation.SetMusic(s, r, bestMusic[dom]);
+            if (c.cash > 8000 && r.layout < 2 && (r.layout == 0 || c.hq >= 2)) Simulation.UpgradeLayout(s, r);
+            int agePref = Simulation.AgePref[dom];
+            if (c.cash > 9000 && Mathf.Abs(r.staffAge - agePref) >= 5) Simulation.RefreshStaffAge(s, r, r.staffAge > agePref ? -5 : 5);
+            if (r.ratsDays > 0) Simulation.Disinfect(s, r);
             if (c.cash > 6000) r.wage = 2;
             if (c.cash > 30000) r.wage = 3;
             if (c.hq >= 2) r.guards = Mathf.Min(Simulation.GuardsNeeded(r), r.guards + 1);
@@ -87,6 +97,9 @@ namespace PizzaTycoon
                 var worst = mine.Where(r => s.day - r.openedDay > 60 && r.last.Profit < -30f).OrderBy(r => r.last.Profit).FirstOrDefault();
                 if (worst != null) { Simulation.Close(s, worst); mine = s.RestaurantsOf(0); }
             }
+            // bribe the mayor when stars are needed; police when rich
+            if (s.City.objectives.Any(o => o.kind == ObjKind.Stars) && c.cash > 8000) c.mayor = Mathf.Max(c.mayor, 1);
+            if (c.cash > 20000 && s.day > 25) c.police = Mathf.Max(c.police, 1);
             // grow existing restaurants when rich
             foreach (var r in mine) if (r.size < 2 && c.cash > 45000 && s.day % 9 == 0) Simulation.Upgrade(s, r, r.style, r.size + 1);
             // headquarters
